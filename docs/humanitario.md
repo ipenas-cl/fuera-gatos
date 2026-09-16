@@ -11,7 +11,7 @@ vecindario.
 
 | Método | Por qué funciona | Límites que aplica el software |
 |---|---|---|
-| **Chorro breve de agua** | Es el más eficaz. Los gatos detestan mojarse y el ruido del aspersor los sobresalta. | Máx. 3-5 s, cooldown, tope por hora, baja presión recomendada |
+| **Chorro de agua dirigido** | Es el más eficaz, y el único que funciona con gatos ya acostumbrados a perros, púas y ultrasonido. Un hilo de agua que los persigue los sobresalta y no se habitúan. | Máx. 4-8 s en ráfagas, cooldown, tope por hora, límites mecánicos de puntería |
 | **Luz repentina** | El cambio brusco los asusta y rompe la sensación de escondite. | Duración corta; de noche no molesta a los vecinos si apunta al suelo |
 | **Sonido de bufido / aire comprimido** | Imita a otro gato o a un perro; sonidos grabados cortos. | Solo de día (horario silencioso configurable) |
 | **Ultrasonido (20-25 kHz)** | Los gatos lo oyen, la mayoría de los adultos no. Es molesto, no doloroso. | Solo mientras hay gato, nunca continuo |
@@ -19,6 +19,17 @@ vecindario.
 Combinados y en escalado, los gatos suelen dejar de venir en una o dos semanas.
 Los dispositivos comerciales que hacen lo mismo (PIR + aspersor, tipo "ScareCrow" o
 "Catwatch") tienen años de uso sin reportes de daño.
+
+### ¿Qué tan fuerte puede ser el chorro?
+
+Fuerte en velocidad y alcance, no en energía. La referencia es la pistola de riego
+de jardín en modo chorro, o una bomba de diafragma de 12 V (hasta 100 psi / 7 bar)
+con boquilla de 1.5-2 mm: moja, sorprende y llega lejos, pero no lastima ni a un
+gatito. Los dispositivos comerciales de este tipo ("Yard Enforcer", "ScareCrow")
+usan la presión de la red (3-4 bar) y llevan décadas en uso sin daños.
+
+Lo que **no** se debe usar es una hidrolavadora (100-200 bar): a esa presión el
+agua corta la piel. Tampoco agua caliente ni con aditivos.
 
 ## Lo que este sistema no hace y no conviene hacer
 
@@ -28,6 +39,26 @@ Los dispositivos comerciales que hacen lo mismo (PIR + aspersor, tipo "ScareCrow
 * **Láseres a los ojos, ultrasonido continuo a alto volumen, agua a presión**:
   pueden lesionar o generar estrés crónico.
 * **Alimentarlos "para que no revuelvan"**: refuerza la visita.
+
+## Gatos que ya no se asustan con nada
+
+Cuando son varios (cinco o más) y ya aprendieron a ignorar perros, ultrasonido o
+púas, lo que falla no es el método sino la previsibilidad: un aparato fijo que
+siempre hace lo mismo se aprende en dos días. Lo que sí funciona con ellos:
+
+1. **Agua que persigue, desde la primera vez.** No dar "avisos" con luz o sonido:
+   el primer contacto con el terreno tiene que ser un chorro dirigido. Por eso la
+   torreta está en el nivel 1.
+2. **Sin huecos.** Cubrir todos los puntos donde bajan del techo. Un solo rincón
+   sin cobertura se convierte en el nuevo baño. Dos cámaras y un aspersor fijo de
+   respaldo por jardín.
+3. **Constancia.** Dos o tres semanas de respuesta inmediata cada vez. Los gatos
+   memorizan el lugar como "malo" y lo sacan de su ruta; los nuevos que lleguen
+   aprenden en pocos días.
+4. **Quitar el motivo.** Basura con traba y malla bajo la tierra. Si no hay premio,
+   no vale la pena arriesgarse al chorro.
+5. **Revisar el registro.** Si después de dos semanas siguen las activaciones en
+   el mismo punto, el chorro no está llegando ahí: recalibrar o mover la torreta.
 
 ## Medidas pasivas que multiplican el efecto
 

@@ -56,6 +56,28 @@ def cmd_test_deterrents(args) -> int:
     return 0
 
 
+def cmd_aim(args) -> int:
+    """Mueve la torreta a un ángulo fijo (y opcionalmente abre el agua) para calibrar."""
+    from .deterrents import build_deterrents
+
+    cfg = load_config(args.config)
+    if args.name not in cfg.deterrents or cfg.deterrents[args.name].type != "turret":
+        print(f"'{args.name}' no es un disuasor de tipo turret", file=sys.stderr)
+        return 2
+    dets = build_deterrents({args.name: cfg.deterrents[args.name]}, simulate=args.simulate)
+    t = dets[args.name]
+    t._move(args.pan, args.tilt)  # noqa: SLF001 - uso deliberado para calibrar
+    print(f"Torreta en pan={args.pan}° tilt={args.tilt}°. "
+          "Anota en qué píxel de la captura cae el chorro para calibration.pan/tilt.")
+    if args.water > 0:
+        t.start(args.water)
+        time.sleep(args.water + 0.2)
+    else:
+        time.sleep(args.hold)
+    t.close()
+    return 0
+
+
 def cmd_check(args) -> int:
     """Muestra qué componentes opcionales están disponibles en este equipo."""
     checks = {
@@ -107,6 +129,16 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--simulate", action="store_true")
     s.add_argument("names", nargs="*")
     s.set_defaults(func=cmd_test_deterrents)
+
+    s = sub.add_parser("aim", help="Mover la torreta a un ángulo fijo para calibrarla")
+    s.add_argument("-c", "--config", default="config.yaml")
+    s.add_argument("--name", default="torreta")
+    s.add_argument("--pan", type=float, required=True)
+    s.add_argument("--tilt", type=float, required=True)
+    s.add_argument("--water", type=float, default=0.0, help="Segundos de agua (0 = solo mover)")
+    s.add_argument("--hold", type=float, default=3.0, help="Segundos que mantiene la posición")
+    s.add_argument("--simulate", action="store_true")
+    s.set_defaults(func=cmd_aim)
 
     s = sub.add_parser("check", help="Verificar dependencias opcionales y configuración")
     s.add_argument("-c", "--config", default=None)

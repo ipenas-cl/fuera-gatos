@@ -9,8 +9,11 @@ def test_example_config_loads():
     assert cfg.detector.backend == "yolo"
     assert [z.name for z in cfg.zones] == ["basura", "jardin", "techo"]
     assert [lv.name for lv in cfg.controller.escalation] == ["nivel_1", "nivel_2"]
-    assert cfg.controller.quiet_hours.allowed == ["luz", "ultrasonido", "aspersor"]
-    assert cfg.deterrents["aspersor"].options["max_on_s"] == 5
+    assert cfg.controller.quiet_hours.allowed == ["torreta", "aspersor", "luz", "ultrasonido"]
+    assert cfg.deterrents["torreta"].type == "turret"
+    assert cfg.deterrents["aspersor"].options["max_on_s"] == 6
+    # El agua es la base desde el primer nivel
+    assert "torreta" in cfg.controller.escalation[0].deterrents
 
 
 def test_unknown_deterrent_in_level_is_rejected():

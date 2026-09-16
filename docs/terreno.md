@@ -23,15 +23,20 @@ basura junto a la entrada.
 
 | Lugar | Por qué vienen | Disuasores | Zona en la configuración |
 |---|---|---|---|
-| Techo (frente y fondo) | Camino de paso entre casas | Luz, ultrasonido, sonido. **Nunca agua**: es techo del vecino, hay canaletas y puede haber mascotas ajenas | `techo_frente`, `techo_fondo` con `deterrents: [luz, ultrasonido, sonido]` |
-| Antejardín | Tierra suelta para enterrar | Todo, incluido un chorro breve | `antejardin` |
-| Basura junto a la entrada | Comida | Todo; además tapa con traba | `basura` |
-| Jardín trasero | Tierra y refugio | Todo | `jardin_trasero` |
+| Techo (frente y fondo) | Camino de paso entre casas | Luz, ultrasonido, sonido. Agua solo si los límites de la torreta garantizan que el chorro cae en tu tramo de techo y no en canaletas ni en el del vecino | `techo_frente`, `techo_fondo` con `deterrents: [luz, ultrasonido, sonido]` (agregar `torreta` si aplica) |
+| Antejardín | Tierra suelta para enterrar | Torreta desde la primera visita, luz; aspersor fijo de respaldo | `antejardin` |
+| Basura junto a la entrada | Comida | Torreta, luz; además tapa con traba | `basura` |
+| Jardín trasero | Tierra y refugio | Torreta, luz, aspersor fijo | `jardin_trasero` |
 | Techo del galpón | Escalera hacia el techo principal | Luz, ultrasonido, sonido (sin mojar lo guardado) | `galpon` |
 
 El objetivo principal no es el techo sino los **puntos de bajada**. Un gato que
-pasa por el techo y no baja no molesta. Por eso la luz y el ultrasonido en el techo
-son un aviso, y el agua en el jardín es la lección.
+pasa por el techo y no baja no molesta. Con gatos acostumbrados, la lección tiene
+que ser el agua desde el primer contacto con el jardín; la luz y el sonido solos
+ya demostraron no servir con este grupo.
+
+Con cinco gatos conviene un `cooldown_s` corto (15 s) y `max_activations_per_hour`
+alto (20): suelen bajar de a varios y el segundo no debe encontrar el sistema en
+pausa.
 
 ## Dos cámaras, uno o dos equipos
 
@@ -67,14 +72,19 @@ journalctl -u 'fuera-gatos*' -f
   `confirm_frames` a 1 temporalmente, abrir la captura de `data/<cámara>/snapshots/`
   y anotar las esquinas de cada polígono en píxeles.
 
-## Aspersores
+## Torreta y aspersores
 
-* Uno por jardín, apuntando **hacia el centro del propio terreno**, nunca hacia la
-  calle, la vereda ni la propiedad vecina. Presión baja: mojar patas, no empapar.
-* Electroválvula en línea con la manguera, dentro de una caja estanca, cable hasta
-  el relé de la Pi correspondiente.
-* Probar con `fuera-gatos test-deterrents -c config.frente.yaml aspersor --seconds 2`
+* **Una torreta por jardín**, montada junto a la cámara, con la bomba y el bidón
+  en la caja estanca. Sus `limits` de pan/tilt deben dejar fuera la vereda, la
+  calle y los patios vecinos, aunque el detector se equivoque.
+* **Un aspersor fijo de impacto por jardín** como respaldo (nivel 2), apuntando
+  hacia el centro del propio terreno. Cubre el rincón que la torreta no alcanza.
+* Probar con `fuera-gatos aim -c config.frente.yaml --pan 90 --tilt 50 --water 1`
+  y con `fuera-gatos test-deterrents -c config.frente.yaml aspersor --seconds 2`,
   y mirar dónde cae el agua.
+* En el antejardín, cuidado con la vereda: si un vecino pasa mientras un gato está
+  en el cantero, el detector ve `person` y apaga todo, pero además los límites
+  mecánicos impiden que la torreta apunte hacia afuera.
 
 ## Con los vecinos
 

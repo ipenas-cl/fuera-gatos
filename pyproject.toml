@@ -20,7 +20,7 @@ yolo = ["ultralytics>=8.1", "opencv-python-headless>=4.8"]
 # Cámara USB / RTSP y guardado de capturas.
 opencv = ["opencv-python-headless>=4.8"]
 # Salidas GPIO de la Raspberry Pi.
-gpio = ["gpiozero>=2.0"]
+gpio = ["gpiozero>=2.0", "smbus2>=0.4"]
 dev = ["pytest>=7"]
 
 [project.scripts]

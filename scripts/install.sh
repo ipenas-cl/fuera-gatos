@@ -5,7 +5,8 @@ cd "$(dirname "$0")/.."
 
 echo "== Paquetes del sistema =="
 sudo apt-get update
-sudo apt-get install -y python3-venv python3-pip python3-picamera2 alsa-utils libgl1 libatlas-base-dev
+sudo apt-get install -y python3-venv python3-pip python3-picamera2 alsa-utils libgl1 libatlas-base-dev i2c-tools
+sudo raspi-config nonint do_i2c 0 || echo "Activa I2C a mano con raspi-config si usas el PCA9685"
 
 echo "== Entorno virtual (con acceso a picamera2 del sistema) =="
 python3 -m venv --system-site-packages .venv

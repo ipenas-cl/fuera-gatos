@@ -35,37 +35,63 @@ zones:
       polygon: [[300, 150], [640, 150], [640, 480], [300, 480]]
     - name: techo
       polygon: [[0, 0], [640, 0], [640, 150], [0, 150]]
-      deterrents: [luz, ultrasonido, sonido]
+      deterrents: [luz, ultrasonido, sonido]   # agregar torreta solo si el chorro cae en tu tramo de techo
 
 controller:
   confirm_frames: 3            # detecciones dentro de la ventana antes de actuar
   confirm_window_s: 2.0
-  cooldown_s: 30               # pausa mínima entre activaciones
-  max_activations_per_hour: 12 # tope para no desperdiciar agua ni molestar vecinos
+  cooldown_s: 15               # pausa mínima entre activaciones (corta: suelen venir varios)
+  max_activations_per_hour: 20 # tope para no desperdiciar agua ni molestar vecinos
   escalate_if_return_within_s: 300  # si el gato vuelve antes de esto, sube de nivel
+  # El agua es la base desde la primera visita: con gatos acostumbrados a perros,
+  # púas y ultrasonido, la luz y el sonido solos no alcanzan.
   escalation:
     - name: nivel_1
-      deterrents: [luz, sonido]
+      deterrents: [torreta, luz]
       duration_s: 4
     - name: nivel_2
-      deterrents: [luz, ultrasonido, aspersor]
-      duration_s: 3
+      deterrents: [torreta, aspersor, luz, sonido]
+      duration_s: 6
   quiet_hours:                 # de noche, nada de sonido audible
     start: "22:00"
     end: "07:00"
-    allowed: [luz, ultrasonido, aspersor]
+    allowed: [torreta, aspersor, luz, ultrasonido]
 
 deterrents:
+  # Torreta: chorro fino de poco caudal que sigue al gato con dos servos.
+  torreta:
+    type: turret
+    valve_pin: 27              # relé de la bomba de 12 V (o electroválvula)
+    active_high: true
+    max_on_s: 8                # tope duro
+    pulse_on_s: 0.6            # ráfagas: más sorpresivo y gasta la mitad de agua
+    pulse_off_s: 0.3
+    lead_s: 0.3                # anticipa el movimiento del gato (segundos)
+    servo:
+      driver: pca9685          # pca9685 (I2C, recomendado) | gpiozero (pines PWM)
+      pan_channel: 0           # con gpiozero usar pan_pin / tilt_pin (BCM)
+      tilt_channel: 1
+    # Píxel -> grados, dos puntos por eje. Se obtienen con `fuera-gatos aim`.
+    calibration:
+      pan:  [[0, 150], [640, 30]]
+      tilt: [[150, 75], [480, 35]]
+    # Límites mecánicos: fuera de esto no apunta nunca (calle, vereda, vecino).
+    limits:
+      pan:  [40, 140]
+      tilt: [25, 80]
+    rest_angles: [90, 60]      # posición de reposo
   luz:
     type: relay
     pin: 17                    # numeración BCM
     active_high: true
     max_on_s: 10
-  aspersor:
+  aspersor:                    # aspersor fijo de respaldo (cubre lo que la torreta no)
     type: relay
-    pin: 27
+    pin: 5
     active_high: true
-    max_on_s: 5                # tope duro: la electroválvula nunca queda abierta más
+    max_on_s: 6                # tope duro: la electroválvula nunca queda abierta más
+    pulse_on_s: 1.0
+    pulse_off_s: 0.5
   ultrasonido:
     type: relay
     pin: 22

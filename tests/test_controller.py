@@ -129,7 +129,7 @@ def test_duration_capped_by_deterrent_hard_limit(env, cat):
 
     ctrl, dets, events, clock = env(escalation=[EscalationLevel("largo", ["aspersor"], 30.0)])
     frames(ctrl, clock, [cat], 3)
-    assert dets["aspersor"].calls[-1] == ("start", 5.0)
+    assert ("start", 5.0) in dets["aspersor"].calls
 
 
 def test_close_stops_everything(env, cat):

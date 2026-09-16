@@ -9,8 +9,9 @@ log = logging.getLogger(__name__)
 
 
 class LogDeterrent(TimedDeterrent):
-    def __init__(self, name: str, max_on_s: float = 10.0, use_timer: bool = True):
-        super().__init__(name, max_on_s)
+    def __init__(self, name: str, max_on_s: float = 10.0, use_timer: bool = True,
+                 pulse_on_s: float = 0.0, pulse_off_s: float = 0.0):
+        super().__init__(name, max_on_s, pulse_on_s=pulse_on_s, pulse_off_s=pulse_off_s)
         self.use_timer = use_timer
         self.calls: list[tuple[str, float]] = []
 
@@ -34,7 +35,9 @@ class LogDeterrent(TimedDeterrent):
             self.active = False
 
     def _on(self) -> None:
+        self.calls.append(("on", 0.0))
         log.info("[SIM] %s ENCENDIDO", self.name)
 
     def _off(self) -> None:
+        self.calls.append(("off", 0.0))
         log.info("[SIM] %s apagado", self.name)

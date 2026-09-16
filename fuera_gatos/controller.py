@@ -126,13 +126,19 @@ class Controller:
 
         targets = [d for d in detections if d.label in self.targets]
 
-        if self.state in (State.ACTIVE, State.COOLDOWN):
+        if self.state == State.ACTIVE:
+            self._aim(targets, now, self._active_names)
+            return self.state
+        if self.state == State.COOLDOWN:
             return self.state
 
         if not targets:
             self._confirm_hits.clear()
             self.state = State.IDLE
             return self.state
+
+        # Pre-apuntar mientras se confirma, para que el chorro salga ya dirigido.
+        self._aim(targets, now, list(self.deterrents))
 
         self._confirm_hits.append(now)
         window_start = now - self.cfg.confirm_window_s
@@ -196,6 +202,22 @@ class Controller:
             Event("suppressed", now, detections=detections,
                   reason=f"presencia de {', '.join(labels)}" + (" (apagado inmediato)" if was_active else ""))
         )
+
+    def _aim(self, targets: list[Detection], now: float, names: list[str]) -> None:
+        """Orienta los disuasores que saben apuntar hacia el gato más grande (el más cercano)."""
+        if not targets:
+            return
+        target = max(targets, key=lambda d: d.area)
+        x, y = target.anchor
+        for n in names:
+            det = self.deterrents.get(n)
+            aim = getattr(det, "aim", None)
+            if aim is None:
+                continue
+            try:
+                aim(x, y, now)
+            except Exception:
+                log.exception("No se pudo apuntar '%s'", n)
 
     def _pick_level(self, now: float) -> tuple[int, EscalationLevel]:
         idx = 0

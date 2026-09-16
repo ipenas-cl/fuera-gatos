@@ -31,24 +31,38 @@ zones:
 controller:
   confirm_frames: 3
   confirm_window_s: 2.0
-  cooldown_s: 30
-  max_activations_per_hour: 12
+  cooldown_s: 15
+  max_activations_per_hour: 20
   escalate_if_return_within_s: 300
   escalation:
     - name: nivel_1
-      deterrents: [luz, sonido]
+      deterrents: [torreta, luz]
       duration_s: 4
     - name: nivel_2
-      deterrents: [luz, ultrasonido, aspersor]
-      duration_s: 3
+      deterrents: [torreta, aspersor, luz, sonido]
+      duration_s: 6
   quiet_hours:
     start: "22:00"
     end: "07:00"
-    allowed: [luz, ultrasonido, aspersor]
+    allowed: [torreta, aspersor, luz, ultrasonido]
 
 deterrents:
+  torreta:
+    type: turret
+    valve_pin: 27
+    active_high: false
+    max_on_s: 8
+    pulse_on_s: 0.6
+    pulse_off_s: 0.3
+    lead_s: 0.3
+    servo: { driver: pca9685, pan_channel: 0, tilt_channel: 1 }
+    calibration:                # ajustar con `fuera-gatos aim`
+      pan:  [[0, 150], [640, 30]]
+      tilt: [[130, 75], [480, 35]]
+    limits: { pan: [40, 140], tilt: [25, 80] }
+    rest_angles: [90, 60]
   luz:        { type: relay, pin: 17, active_high: false, max_on_s: 10 }
-  aspersor:   { type: relay, pin: 27, active_high: false, max_on_s: 5 }
+  aspersor:   { type: relay, pin: 5, active_high: false, max_on_s: 6, pulse_on_s: 1.0, pulse_off_s: 0.5 }
   ultrasonido: { type: relay, pin: 22, active_high: false, max_on_s: 10 }
   sonido:     { type: sound, files: [sounds/hiss.wav, sounds/air.wav], player: aplay }
 

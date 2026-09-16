@@ -4,25 +4,32 @@ Sistema de detección de gatos con cámara que los **asusta sin lastimarlos** pa
 dejen de usar el terreno como baño y de romper las bolsas de basura.
 
 La idea es simple: una cámara vigila las zonas problemáticas (la basura, el cantero),
-una red neuronal reconoce al gato, y el sistema responde con un susto corto y
-proporcional: primero luz y un bufido grabado; si el gato insiste, un chorrito de agua
-de pocos segundos. Los gatos aprenden rápido que ese lugar "es raro" y buscan otro.
+una red neuronal reconoce al gato, y una **torreta lanza un chorro fino de agua que
+lo persigue** durante unos segundos, en ráfagas. Poco caudal, mucho alcance, y el
+gato no sabe de dónde viene. Está pensado para gatos callejeros ya acostumbrados a
+perros, púas y ultrasonido: con ellos la luz y el sonido solos no sirven, así que el
+agua es la base desde la primera visita, no el último recurso.
 
 ```
  cámara ──> detector (YOLO o movimiento) ──> zonas ──> controlador ──> disuasores
+                                                          │              ├─ torreta (2 servos + bomba)
+                                                          │              ├─ aspersor fijo (electroválvula)
                                                           │              ├─ luz (relé)
                                                           │              ├─ sonido (parlante)
-                                                          │              ├─ ultrasonido (relé)
-                                                          │              └─ aspersor (electroválvula)
+                                                          │              └─ ultrasonido (relé)
                                                           └──> registro JSONL + captura + Telegram
 ```
 
 ## Principios: asustar, nunca dañar
 
-* **Susto corto y proporcional.** Cada activación dura 3-4 s y tiene un tope duro por
-  disuasor (`max_on_s`). La electroválvula del agua nunca puede quedar abierta.
-* **Escalado.** Primera visita: luz + bufido. Si vuelve en menos de 5 minutos: luz +
-  ultrasonido + agua. Si pasa mucho tiempo sin verlo, se vuelve al nivel suave.
+* **Fuerte en sorpresa, no en fuerza.** El chorro es el de una pistola de riego o una
+  bomba de 12 V con boquilla fina: moja y persigue, no lastima. Nunca una hidrolavadora.
+* **Corto y con tope.** Cada activación dura 4-6 s en ráfagas y tiene un tope duro por
+  disuasor (`max_on_s`). La bomba nunca puede quedar encendida.
+* **Puntería acotada.** La torreta tiene límites mecánicos configurables: aunque el
+  detector se equivoque, no puede apuntar a la vereda ni al patio del vecino.
+* **Escalado.** Primera visita: torreta + luz. Si vuelve en menos de 5 minutos: torreta +
+  aspersor fijo + luz + sonido. Si pasa mucho tiempo sin verlo, se vuelve al nivel 1.
 * **Confirmación.** Hacen falta varias detecciones seguidas antes de actuar: una
   sombra o un pájaro no disparan nada.
 * **Pausa y tope por hora.** Cooldown de 30 s entre activaciones y máximo 12 por hora.
@@ -46,8 +53,10 @@ Lo mínimo:
 |---|---|
 | Raspberry Pi 4 o 5 (2 GB alcanza) | Corre la detección |
 | Cámara Pi Module 3 **NoIR** + iluminador IR | Ver de noche, cuando más vienen |
-| Módulo de 4 relés 5 V optoacoplados | Encender luz, válvula y ultrasonido |
-| Electroválvula 12 V para manguera + fuente 12 V | Chorro de agua breve |
+| Módulo de 4 relés 5 V optoacoplados | Bomba, válvula, luz y ultrasonido |
+| 2 servos metálicos (MG996R) + PCA9685 + soporte pan/tilt | Torreta que sigue al gato |
+| Bomba de diafragma 12 V + boquilla de chorro 1.5-2 mm + fuente 12 V | Chorro fino y largo con poco caudal |
+| Electroválvula 12 V + aspersor de impacto | Respaldo fijo para el nivel 2 |
 | Reflector LED 12 V | Luz repentina |
 | Parlante 3 W + amplificador PAM8403 | Bufido / chorro de aire |
 | Repelente ultrasónico comercial (disparado por relé) | Sonido que solo molesta al gato |
@@ -65,6 +74,7 @@ cd fuera-gatos
 nano config.yaml              # pines, zonas, horarios
 .venv/bin/fuera-gatos check -c config.yaml
 .venv/bin/fuera-gatos test-deterrents -c config.yaml --seconds 1   # probar cableado
+.venv/bin/fuera-gatos aim -c config.yaml --pan 90 --tilt 50 --water 1   # calibrar torreta
 .venv/bin/fuera-gatos run -c config.yaml
 sudo systemctl enable --now fuera-gatos                            # arrancar solo
 ```
@@ -104,7 +114,9 @@ Todo está en `config.yaml` (ver `config.example.yaml`, comentado). Lo más impo
   Con `deterrents: [luz, ultrasonido]` una zona limita qué se puede usar en ella.
 * **`controller.escalation`**: niveles, qué disuasores usa cada uno y cuántos segundos.
 * **`controller.quiet_hours`**: horario nocturno y qué disuasores se permiten.
-* **`deterrents`**: un relé por disuasor (pin BCM) o un sonido con archivos WAV.
+* **`deterrents`**: la torreta (`turret`: relé de bomba, servos, calibración píxel a
+  grado, límites y ráfagas), relés (`relay`, con `pulse_on_s`/`pulse_off_s` opcionales)
+  o sonido (`sound`, archivos WAV).
 * **`detector.suppress_labels`**: etiquetas que bloquean todo (`person`, `dog`).
 
 ### Detector
@@ -125,13 +137,14 @@ Sirve para ver a qué horas viene el gato y ajustar zonas o niveles. Con
 
 ```
 fuera_gatos/
-  cli.py          comandos: run, simulate, test-deterrents, check
+  cli.py          comandos: run, simulate, test-deterrents, aim, check
   pipeline.py     bucle cámara -> detector -> zonas -> controlador
   controller.py   máquina de estados (confirmación, escalado, cooldown, supresión)
   zones.py        polígonos de actuación
   camera.py       picamera2, OpenCV (USB/RTSP) o sintética
   detection/      yolo.py, motion.py, scripted.py
-  deterrents/     relay.py (GPIO), sound.py, simulated.py
+  deterrents/     turret.py (pan/tilt + bomba), servo.py (PCA9685/gpiozero),
+                  relay.py (GPIO), sound.py, simulated.py
   events.py       JSONL + capturas
   notify.py       Telegram
 docs/             hardware.md, humanitario.md, terreno.md

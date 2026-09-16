@@ -24,13 +24,22 @@ class Deterrent(Protocol):
 
 
 class TimedDeterrent:
-    """Base con temporizador de apagado y tope duro de seguridad."""
+    """Base con temporizador de apagado y tope duro de seguridad.
 
-    def __init__(self, name: str, max_on_s: float = 10.0):
+    Con `pulse_on_s`/`pulse_off_s` la salida se enciende y apaga en ráfagas
+    mientras dura la activación (un chorro intermitente sorprende más que uno
+    continuo y gasta la mitad de agua).
+    """
+
+    def __init__(self, name: str, max_on_s: float = 10.0,
+                 pulse_on_s: float = 0.0, pulse_off_s: float = 0.0):
         self.name = name
         self.max_on_s = float(max_on_s)
+        self.pulse_on_s = float(pulse_on_s)
+        self.pulse_off_s = float(pulse_off_s)
         self._timer: threading.Timer | None = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        self._generation = 0
         self.active = False
 
     # Implementar en subclases
@@ -52,13 +61,37 @@ class TimedDeterrent:
             except Exception:
                 log.exception("No se pudo activar '%s'", self.name)
                 return
+            self._generation += 1
             self._timer = threading.Timer(duration, self.stop)
             self._timer.daemon = True
             self._timer.start()
+            if self.pulse_on_s > 0 and self.pulse_off_s > 0:
+                th = threading.Thread(target=self._pulse_loop, args=(self._generation,), daemon=True)
+                th.start()
+
+    def _pulse_loop(self, generation: int) -> None:
+        import time
+
+        on = True
+        while True:
+            time.sleep(self.pulse_on_s if on else self.pulse_off_s)
+            with self._lock:
+                if not self.active or generation != self._generation:
+                    return
+                try:
+                    if on:
+                        self._off()
+                    else:
+                        self._on()
+                except Exception:
+                    log.exception("Error en ráfaga de '%s'", self.name)
+                    return
+            on = not on
 
     def stop(self) -> None:
         with self._lock:
             self._cancel_timer()
+            self._generation += 1  # detiene cualquier hilo de ráfagas
             if not self.active:
                 return
             try:
