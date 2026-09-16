@@ -1,0 +1,177 @@
+# Nodo nodo-techo: ESP32 con ESPHome. Recibe órdenes por MQTT desde fuera-gatos.
+# Cada salida se apaga sola por firmware (tope duro) aunque se caiga la red.
+# Compilar y subir:  esphome run nodo-techo.yaml
+
+esphome:
+  name: nodo-techo
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          // Todo apagado al arrancar
+          id(torreta_a_bomba).turn_off();
+          id(torreta_b_bomba).turn_off();
+          id(luz).turn_off();
+
+esp32:
+  board: esp32dev
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # Sin WiFi durante 5 min: reinicia (y todo arranca apagado)
+  reboot_timeout: 5min
+
+mqtt:
+  broker: !secret mqtt_host
+  username: !secret mqtt_user
+  password: !secret mqtt_password
+  discovery: false
+  topic_prefix: nodo-techo
+  birth_message:
+    topic: nodo-techo/status
+    payload: online
+  will_message:
+    topic: nodo-techo/status
+    payload: offline
+
+logger:
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+switch:
+  - platform: gpio
+    name: "torreta_a_bomba"
+    id: torreta_a_bomba
+    pin: GPIO25
+    inverted: true              # módulo de relés activo en bajo; quitar si es activo en alto
+    restore_mode: ALWAYS_OFF
+    on_turn_on:                 # tope duro: nunca más de 8 s seguidos
+      - delay: 8s
+      - switch.turn_off: torreta_a_bomba
+  - platform: gpio
+    name: "torreta_b_bomba"
+    id: torreta_b_bomba
+    pin: GPIO26
+    inverted: true              # módulo de relés activo en bajo; quitar si es activo en alto
+    restore_mode: ALWAYS_OFF
+    on_turn_on:                 # tope duro: nunca más de 8 s seguidos
+      - delay: 8s
+      - switch.turn_off: torreta_b_bomba
+  - platform: gpio
+    name: "luz"
+    id: luz
+    pin: GPIO27
+    inverted: true              # módulo de relés activo en bajo; quitar si es activo en alto
+    restore_mode: ALWAYS_OFF
+    on_turn_on:                 # tope duro: nunca más de 10 s seguidos
+      - delay: 10s
+      - switch.turn_off: luz
+
+# Servos de la(s) torreta(s). Fuente propia de 5-6 V; GND común con el ESP32.
+output:
+  - platform: ledc
+    id: torreta_a_pan_pwm
+    pin: GPIO18
+    frequency: 50 Hz
+  - platform: ledc
+    id: torreta_a_tilt_pwm
+    pin: GPIO19
+    frequency: 50 Hz
+  - platform: ledc
+    id: torreta_b_pan_pwm
+    pin: GPIO21
+    frequency: 50 Hz
+  - platform: ledc
+    id: torreta_b_tilt_pwm
+    pin: GPIO22
+    frequency: 50 Hz
+
+servo:
+  - id: torreta_a_pan_servo
+    output: torreta_a_pan_pwm
+    min_level: 2.5%             # 0.5 ms
+    max_level: 12.5%            # 2.5 ms
+    auto_detach_time: 2s        # suelta el servo tras moverse: sin zumbido ni calor
+    transition_length: 150ms
+  - id: torreta_a_tilt_servo
+    output: torreta_a_tilt_pwm
+    min_level: 2.5%             # 0.5 ms
+    max_level: 12.5%            # 2.5 ms
+    auto_detach_time: 2s        # suelta el servo tras moverse: sin zumbido ni calor
+    transition_length: 150ms
+  - id: torreta_b_pan_servo
+    output: torreta_b_pan_pwm
+    min_level: 2.5%             # 0.5 ms
+    max_level: 12.5%            # 2.5 ms
+    auto_detach_time: 2s        # suelta el servo tras moverse: sin zumbido ni calor
+    transition_length: 150ms
+  - id: torreta_b_tilt_servo
+    output: torreta_b_tilt_pwm
+    min_level: 2.5%             # 0.5 ms
+    max_level: 12.5%            # 2.5 ms
+    auto_detach_time: 2s        # suelta el servo tras moverse: sin zumbido ni calor
+    transition_length: 150ms
+
+# Ángulo 0-180 recibido por MQTT en <nodo>/number/<nombre>/command
+number:
+  - platform: template
+    name: "torreta_a_pan"
+    id: torreta_a_pan
+    min_value: 0
+    max_value: 180
+    step: 0.5
+    initial_value: 90
+    optimistic: true
+    set_action:
+      - servo.write:
+          id: torreta_a_pan_servo
+          level: !lambda 'return (x / 90.0) - 1.0;'   # 0..180 -> -1..1
+  - platform: template
+    name: "torreta_a_tilt"
+    id: torreta_a_tilt
+    min_value: 0
+    max_value: 180
+    step: 0.5
+    initial_value: 90
+    optimistic: true
+    set_action:
+      - servo.write:
+          id: torreta_a_tilt_servo
+          level: !lambda 'return (x / 90.0) - 1.0;'   # 0..180 -> -1..1
+  - platform: template
+    name: "torreta_b_pan"
+    id: torreta_b_pan
+    min_value: 0
+    max_value: 180
+    step: 0.5
+    initial_value: 90
+    optimistic: true
+    set_action:
+      - servo.write:
+          id: torreta_b_pan_servo
+          level: !lambda 'return (x / 90.0) - 1.0;'   # 0..180 -> -1..1
+  - platform: template
+    name: "torreta_b_tilt"
+    id: torreta_b_tilt
+    min_value: 0
+    max_value: 180
+    step: 0.5
+    initial_value: 90
+    optimistic: true
+    set_action:
+      - servo.write:
+          id: torreta_b_tilt_servo
+          level: !lambda 'return (x / 90.0) - 1.0;'   # 0..180 -> -1..1
+
+binary_sensor:
+  - platform: gpio
+    name: "estanque_vacio"
+    id: estanque_vacio
+    pin:
+      number: GPIO34
+      mode: INPUT_PULLUP
+      inverted: true            # flotador cierra a masa cuando NO hay agua -> ON = vacío
+    filters:
+      - delayed_on_off: 2s

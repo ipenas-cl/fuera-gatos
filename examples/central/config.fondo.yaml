@@ -1,0 +1,94 @@
+# Modo centralizado: la laptop del armario corre Frigate + Mosquitto + fuera-gatos.
+# Esta instancia atiende la cámara "fondo" de Frigate y comanda el nodo ESP32 "nodo-fondo".
+
+mqtt:
+  host: localhost            # Mosquitto en la misma laptop
+  port: 1883
+  client_id: fuera-gatos-fondo
+
+camera:
+  source: none               # el video lo procesa Frigate; aquí solo se marca el ritmo
+  width: 640                 # resolución de detección configurada en Frigate (detect.width/height)
+  height: 480
+  fps: 5
+
+detector:
+  backend: frigate
+  camera: fondo
+  topic: frigate/events
+  confidence: 0.5
+  target_labels: [cat]
+  suppress_labels: [person, dog]
+
+zones:
+  include:
+    - name: techo_fondo
+      polygon: [[0, 0], [640, 0], [640, 140], [0, 140]]
+      deterrents: [luz, ultrasonido, sonido]
+    - name: jardin_trasero
+      polygon: [[0, 140], [640, 140], [640, 480], [0, 480]]
+    - name: galpon
+      polygon: [[420, 140], [640, 140], [640, 300], [420, 300]]
+      deterrents: [luz, ultrasonido, sonido]
+
+controller:
+  confirm_frames: 3
+  confirm_window_s: 2.5
+  cooldown_s: 15
+  max_activations_per_hour: 20
+  escalate_if_return_within_s: 300
+  escalation:
+    - name: nivel_1
+      deterrents: [torreta, luz]
+      duration_s: 4
+    - name: nivel_2
+      deterrents: [torreta, aspersor, luz, sonido]
+      duration_s: 6
+  quiet_hours:
+    start: "22:00"
+    end: "07:00"
+    allowed: [torreta, aspersor, luz, ultrasonido]
+
+deterrents:
+  torreta:
+    type: mqtt_turret
+    max_on_s: 8
+    pulse_on_s: 0.6
+    pulse_off_s: 0.3
+    lead_s: 0.3
+    topics:
+      pan:   nodo-fondo/number/torreta_pan/command
+      tilt:  nodo-fondo/number/torreta_tilt/command
+      valve: nodo-fondo/switch/torreta_bomba/command
+    calibration:                # ajustar con `fuera-gatos aim --name torreta`
+      pan:  [[0, 150], [640, 30]]
+      tilt: [[130, 75], [480, 35]]
+    limits: { pan: [40, 140], tilt: [25, 80] }
+    rest_angles: [90, 50]
+  aspersor:
+    type: mqtt_switch
+    topic: nodo-fondo/switch/aspersor/command
+    max_on_s: 6
+    pulse_on_s: 1.0
+    pulse_off_s: 0.5
+  luz:
+    type: mqtt_switch
+    topic: nodo-fondo/switch/luz/command
+    max_on_s: 10
+  ultrasonido:
+    type: mqtt_switch
+    topic: nodo-fondo/switch/ultrasonido/command
+    max_on_s: 10
+  sonido:
+    type: mqtt_switch          # el nodo reproduce el bufido (DFPlayer) al recibir ON
+    topic: nodo-fondo/switch/sonido/command
+    max_on_s: 5
+
+events:
+  log_file: data/fondo/events.jsonl
+  snapshots_dir: data/fondo/snapshots
+  save_snapshots: true
+  snapshot_url: http://localhost:5000/api/fondo/latest.jpg?h=480
+
+notify:
+  telegram: { enabled: false, token: "", chat_id: "" }

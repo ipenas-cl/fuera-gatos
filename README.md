@@ -68,6 +68,18 @@ Con una Pi Zero 2 W también funciona usando el detector por movimiento
 La lista de materiales completa, por ubicación y con el consolidado de compra, está en
 [docs/materiales.md](docs/materiales.md).
 
+## Modo centralizado (recomendado si ya tienes un servidor en casa)
+
+Una laptop o servidor viejo corre Frigate (grabador con detección), Mosquitto y
+fuera-gatos. Afuera solo van cámaras IP con PoE y un nodo ESP32 por ubicación para
+relés, servos y flotador. El mismo equipo graba las tres cámaras y avisa si entra
+una persona. Guía completa en [docs/central.md](docs/central.md); configuraciones en
+`examples/central/` (Frigate, docker-compose, fuera-gatos) y `examples/esphome/` (nodos).
+
+```bash
+cd examples/central && docker compose up -d
+```
+
 ## Instalación (Raspberry Pi OS)
 
 ```bash
@@ -120,8 +132,9 @@ Todo está en `config.yaml` (ver `config.example.yaml`, comentado). Lo más impo
 * **`controller.escalation`**: niveles, qué disuasores usa cada uno y cuántos segundos.
 * **`controller.quiet_hours`**: horario nocturno y qué disuasores se permiten.
 * **`deterrents`**: la torreta (`turret`: relé de bomba, servos, calibración píxel a
-  grado, límites y ráfagas), relés (`relay`, con `pulse_on_s`/`pulse_off_s` opcionales)
-  o sonido (`sound`, archivos WAV).
+  grado, límites y ráfagas), relés (`relay`, con `pulse_on_s`/`pulse_off_s` opcionales),
+  sonido (`sound`, archivos WAV), o sus equivalentes remotos por MQTT hacia un nodo
+  ESP32 (`mqtt_switch`, `mqtt_turret`).
 * **`detector.suppress_labels`**: etiquetas que bloquean todo (`person`, `dog`).
 * **`sensors`**: flotador del estanque (`float_switch`) que custodia una lista de
   disuasores (`gates`): sin agua no se activan y llega un aviso para rellenar.
@@ -133,6 +146,8 @@ Todo está en `config.yaml` (ver `config.example.yaml`, comentado). Lo más impo
   y poner `model: yolov8n_ncnn_model`; da unos 5-10 fps en Pi 4 y más en Pi 5.
 * `motion`: diferencia de cuadros con filtro por tamaño del bulto. No sabe qué es un
   gato, así que úsalo solo con zonas bien acotadas y `min_area`/`max_area` ajustados.
+* `frigate`: no procesa video; lee por MQTT los objetos que Frigate ya reconoció en la
+  cámara indicada. Es el modo centralizado.
 
 ## Registro y avisos
 
@@ -148,15 +163,18 @@ fuera_gatos/
   pipeline.py     bucle cámara -> detector -> zonas -> controlador
   controller.py   máquina de estados (confirmación, escalado, cooldown, supresión)
   zones.py        polígonos de actuación
-  sensors.py      flotador de nivel del estanque
+  sensors.py      flotador de nivel del estanque (GPIO o MQTT)
+  mqtt.py         cliente MQTT compartido (Frigate y nodos ESP32)
   camera.py       picamera2, OpenCV (USB/RTSP) o sintética
-  detection/      yolo.py, motion.py, scripted.py
+  detection/      yolo.py, motion.py, frigate.py, scripted.py
   deterrents/     turret.py (pan/tilt + bomba), servo.py (PCA9685/gpiozero),
-                  relay.py (GPIO), sound.py, simulated.py
+                  relay.py (GPIO), sound.py, mqtt.py (nodos ESP32), simulated.py
   events.py       JSONL + capturas
   notify.py       Telegram
-docs/             hardware.md, humanitario.md, terreno.md, techo.md
-examples/         config.frente.yaml, config.fondo.yaml, config.techo.yaml
+docs/             hardware.md, humanitario.md, terreno.md, techo.md, central.md
+examples/         config.{frente,fondo,techo}.yaml (una Pi por caja)
+examples/central/ frigate.yml, docker-compose.yml, config.*.yaml (modo centralizado)
+examples/esphome/ nodo-{frente,fondo,techo}.yaml (firmware de los nodos ESP32)
 scripts/          install.sh, make_sounds.py
 systemd/          fuera-gatos.service (una cámara), fuera-gatos@.service (varias)
 tests/            pytest (lógica pura, sin hardware)

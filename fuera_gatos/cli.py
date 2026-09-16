@@ -42,16 +42,21 @@ def cmd_simulate(args) -> int:
 def cmd_test_deterrents(args) -> int:
     from .deterrents import build_deterrents
 
+    from .pipeline import build_bus
+
     cfg = load_config(args.config)
     names = args.names or list(cfg.deterrents)
+    bus = build_bus(cfg, simulate=args.simulate)
     dets = build_deterrents({n: cfg.deterrents[n] for n in names if n in cfg.deterrents},
-                            simulate=args.simulate)
+                            simulate=args.simulate, bus=bus)
     for name, d in dets.items():
         print(f"Probando '{name}' durante {args.seconds} s...")
         d.start(args.seconds)
         time.sleep(args.seconds + 0.2)
         d.stop()
         d.close()
+    if bus is not None:
+        bus.close()
     print("Listo.")
     return 0
 
@@ -60,11 +65,14 @@ def cmd_aim(args) -> int:
     """Mueve la torreta a un ángulo fijo (y opcionalmente abre el agua) para calibrar."""
     from .deterrents import build_deterrents
 
+    from .pipeline import build_bus
+
     cfg = load_config(args.config)
-    if args.name not in cfg.deterrents or cfg.deterrents[args.name].type != "turret":
-        print(f"'{args.name}' no es un disuasor de tipo turret", file=sys.stderr)
+    if args.name not in cfg.deterrents or cfg.deterrents[args.name].type not in ("turret", "mqtt_turret"):
+        print(f"'{args.name}' no es una torreta (turret / mqtt_turret)", file=sys.stderr)
         return 2
-    dets = build_deterrents({args.name: cfg.deterrents[args.name]}, simulate=args.simulate)
+    bus = build_bus(cfg, simulate=args.simulate)
+    dets = build_deterrents({args.name: cfg.deterrents[args.name]}, simulate=args.simulate, bus=bus)
     t = dets[args.name]
     t._move(args.pan, args.tilt)  # noqa: SLF001 - uso deliberado para calibrar
     print(f"Torreta en pan={args.pan}° tilt={args.tilt}°. "
@@ -75,6 +83,8 @@ def cmd_aim(args) -> int:
     else:
         time.sleep(args.hold)
     t.close()
+    if bus is not None:
+        bus.close()
     return 0
 
 
@@ -86,6 +96,7 @@ def cmd_check(args) -> int:
         "ultralytics (YOLO)": "ultralytics",
         "picamera2 (cámara Pi)": "picamera2",
         "gpiozero (relés)": "gpiozero",
+        "paho-mqtt (Frigate y nodos ESP32)": "paho.mqtt.client",
     }
     for label, mod in checks.items():
         try:

@@ -10,7 +10,10 @@ from .simulated import LogDeterrent
 log = logging.getLogger(__name__)
 
 
-def build_deterrents(configs: dict[str, DeterrentConfig], simulate: bool = False) -> dict[str, Deterrent]:
+def build_deterrents(configs: dict[str, DeterrentConfig], simulate: bool = False,
+                     bus=None) -> dict[str, Deterrent]:
+    """`bus` es el cliente MQTT (o FakeBus) para los tipos mqtt_*; en simulación
+    los disuasores MQTT publican igual, sobre el bus que se les pase."""
     out: dict[str, Deterrent] = {}
     for name, cfg in configs.items():
         max_on = float(cfg.options.get("max_on_s", 10.0))
@@ -18,6 +21,21 @@ def build_deterrents(configs: dict[str, DeterrentConfig], simulate: bool = False
             pulse_on_s=float(cfg.options.get("pulse_on_s", 0.0)),
             pulse_off_s=float(cfg.options.get("pulse_off_s", 0.0)),
         )
+        if cfg.type in ("mqtt_switch", "mqtt_turret"):
+            if bus is None:
+                raise ValueError(f"Disuasor '{name}' es MQTT pero no hay bus configurado")
+            from .mqtt import MqttSwitch, build_mqtt_turret
+
+            if cfg.type == "mqtt_switch":
+                out[name] = MqttSwitch(
+                    name, bus, topic=str(cfg.options["topic"]),
+                    on_payload=str(cfg.options.get("on_payload", "ON")),
+                    off_payload=str(cfg.options.get("off_payload", "OFF")),
+                    max_on_s=max_on, **pulse,
+                )
+            else:
+                out[name] = build_mqtt_turret(name, bus, cfg.options, max_on, pulse)
+            continue
         if simulate:
             if cfg.type == "turret":
                 out[name] = _build_turret(name, cfg.options, max_on, pulse, simulate=True)

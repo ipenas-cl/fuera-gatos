@@ -64,11 +64,44 @@ class SimulatedSensor:
         pass
 
 
-def build_sensors(configs: dict[str, SensorConfig], simulate: bool = False) -> dict[str, Sensor]:
+class MqttBinarySensor:
+    """Estado publicado por un nodo (ESPHome binary_sensor): ON/OFF en un tópico.
+
+    `empty_payload` es el valor que significa "sin recurso". Hasta recibir el
+    primer mensaje se asume que hay recurso, salvo `assume_empty_until_seen`.
+    """
+
+    def __init__(self, name: str, bus, topic: str, empty_payload: str = "ON",
+                 gates: list[str] | None = None, assume_empty_until_seen: bool = False):
+        self.name = name
+        self.gates = list(gates or [])
+        self.empty_payload = empty_payload
+        self._empty = assume_empty_until_seen
+        bus.subscribe(topic, self._on_msg)
+
+    def _on_msg(self, topic: str, payload: bytes) -> None:
+        self._empty = payload.decode(errors="ignore").strip() == self.empty_payload
+
+    def ok(self) -> bool:
+        return not self._empty
+
+    def close(self) -> None:
+        pass
+
+
+def build_sensors(configs: dict[str, SensorConfig], simulate: bool = False, bus=None) -> dict[str, Sensor]:
     out: dict[str, Sensor] = {}
     for name, cfg in configs.items():
         gates = [str(g) for g in cfg.options.get("gates", [])]
-        if simulate or cfg.type == "log":
+        if cfg.type == "mqtt_binary":
+            if bus is None:
+                raise ValueError(f"Sensor '{name}' es MQTT pero no hay bus configurado")
+            out[name] = MqttBinarySensor(
+                name, bus, topic=str(cfg.options["topic"]),
+                empty_payload=str(cfg.options.get("empty_payload", "ON")), gates=gates,
+                assume_empty_until_seen=bool(cfg.options.get("assume_empty_until_seen", False)),
+            )
+        elif simulate or cfg.type == "log":
             out[name] = SimulatedSensor(name, gates=gates)
         elif cfg.type == "float_switch":
             out[name] = FloatSwitch(name, pin=int(cfg.options["pin"]),

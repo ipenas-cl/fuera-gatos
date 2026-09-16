@@ -1,0 +1,47 @@
+# Laptop del armario: Frigate (NVR + detección), Mosquitto (MQTT) y fuera-gatos.
+# Uso:  docker compose up -d
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports: ["1883:1883"]
+    volumes:
+      - ./mosquitto:/mosquitto/config
+      - mosquitto-data:/mosquitto/data
+
+  frigate:
+    image: ghcr.io/blakeblackshear/frigate:stable
+    restart: unless-stopped
+    privileged: true            # necesario para la GPU integrada / Coral
+    shm_size: "256mb"
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128   # Intel iGPU (OpenVINO + VAAPI)
+      # - /dev/bus/usb:/dev/bus/usb               # Coral USB
+    volumes:
+      - ./frigate.yml:/config/config.yml:ro
+      - /srv/frigate:/media/frigate          # grabaciones: disco grande
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "5000:5000"             # interfaz web
+      - "8554:8554"             # RTSP re-emitido
+    depends_on: [mosquitto]
+
+  fuera-gatos:
+    build: ../..                # Dockerfile en la raíz del repo
+    restart: unless-stopped
+    network_mode: host          # llega a localhost:1883 y :5000
+    volumes:
+      - ./config.frente.yaml:/app/config.frente.yaml:ro
+      - ./config.fondo.yaml:/app/config.fondo.yaml:ro
+      - ./config.techo.yaml:/app/config.techo.yaml:ro
+      - fg-data:/app/data
+    command: >
+      sh -c "fuera-gatos run -c config.frente.yaml &
+             fuera-gatos run -c config.fondo.yaml &
+             fuera-gatos run -c config.techo.yaml &
+             wait"
+    depends_on: [mosquitto, frigate]
+
+volumes:
+  mosquitto-data:
+  fg-data:

@@ -45,13 +45,25 @@ class EventLog:
         data = event.to_dict()
         data["wall_time"] = time.strftime("%Y-%m-%dT%H:%M:%S")
         snapshot = None
-        if frame is not None and self.cfg.save_snapshots and event.kind == "activated":
+        if self.cfg.save_snapshots and event.kind == "activated":
             name = time.strftime("%Y%m%d-%H%M%S") + f"-{event.level}.jpg"
             try:
-                snapshot = save_image(self.snap_dir / name, frame)
-                data["snapshot"] = str(snapshot)
+                if self.cfg.snapshot_url:
+                    snapshot = self._fetch_snapshot(self.snap_dir / name)
+                elif frame is not None:
+                    snapshot = save_image(self.snap_dir / name, frame)
+                if snapshot:
+                    data["snapshot"] = str(snapshot)
             except Exception:
                 log.exception("No se pudo guardar la captura")
         with self.log_path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(data, ensure_ascii=False) + "\n")
         return snapshot
+
+    def _fetch_snapshot(self, path: Path) -> Path | None:
+        import urllib.request
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with urllib.request.urlopen(self.cfg.snapshot_url, timeout=5) as resp:
+            path.write_bytes(resp.read())
+        return path

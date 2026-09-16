@@ -33,6 +33,8 @@ class MotionConfig:
 class DetectorConfig:
     backend: str = "motion"
     model: str = "yolov8n.pt"
+    camera: str = ""            # backend=frigate: nombre de la cámara en Frigate
+    topic: str = "frigate/events"
     confidence: float = 0.45
     target_labels: list[str] = field(default_factory=lambda: ["cat"])
     suppress_labels: list[str] = field(default_factory=lambda: ["person", "dog"])
@@ -94,6 +96,16 @@ class EventsConfig:
     log_file: str = "data/events.jsonl"
     snapshots_dir: str = "data/snapshots"
     save_snapshots: bool = True
+    snapshot_url: str = ""      # p. ej. http://frigate:5000/api/<camara>/latest.jpg
+
+
+@dataclass
+class MqttConfig:
+    host: str = ""
+    port: int = 1883
+    username: str = ""
+    password: str = ""
+    client_id: str = "fuera-gatos"
 
 
 @dataclass
@@ -116,6 +128,7 @@ class AppConfig:
     controller: ControllerConfig = field(default_factory=ControllerConfig)
     deterrents: dict[str, DeterrentConfig] = field(default_factory=dict)
     sensors: dict[str, SensorConfig] = field(default_factory=dict)
+    mqtt: MqttConfig = field(default_factory=MqttConfig)
     events: EventsConfig = field(default_factory=EventsConfig)
     notify: NotifyConfig = field(default_factory=NotifyConfig)
 
@@ -147,8 +160,10 @@ def config_from_dict(raw: dict) -> AppConfig:
     detector = _build(
         DetectorConfig, det_raw, motion=_build(MotionConfig, _sub(det_raw, "motion"))
     )
-    if detector.backend not in ("yolo", "motion"):
-        raise ConfigError("detector.backend debe ser 'yolo' o 'motion'")
+    if detector.backend not in ("yolo", "motion", "frigate"):
+        raise ConfigError("detector.backend debe ser 'yolo', 'motion' o 'frigate'")
+    if detector.backend == "frigate" and not detector.camera:
+        raise ConfigError("detector.camera es obligatorio con backend=frigate")
     if not 0 < detector.confidence <= 1:
         raise ConfigError("detector.confidence debe estar entre 0 y 1")
     if not detector.target_labels:
@@ -219,6 +234,12 @@ def config_from_dict(raw: dict) -> AppConfig:
         sensors[name] = SensorConfig(name=name, type=str(d["type"]), options=opts)
 
     events = _build(EventsConfig, _sub(raw, "events"))
+    mqtt = _build(MqttConfig, _sub(raw, "mqtt"))
+    needs_mqtt = detector.backend == "frigate" or any(
+        d.type.startswith("mqtt") for d in deterrents.values()
+    ) or any(sn.type.startswith("mqtt") for sn in sensors.values())
+    if needs_mqtt and not mqtt.host:
+        raise ConfigError("Se usa Frigate o nodos MQTT pero falta mqtt.host")
     notify_raw = _sub(raw, "notify")
     notify = NotifyConfig(telegram=_build(TelegramConfig, _sub(notify_raw, "telegram")))
 
@@ -229,6 +250,7 @@ def config_from_dict(raw: dict) -> AppConfig:
         controller=controller,
         deterrents=deterrents,
         sensors=sensors,
+        mqtt=mqtt,
         events=events,
         notify=notify,
     )

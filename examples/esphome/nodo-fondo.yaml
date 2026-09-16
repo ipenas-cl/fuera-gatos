@@ -1,0 +1,152 @@
+# Nodo nodo-fondo: ESP32 con ESPHome. Recibe órdenes por MQTT desde fuera-gatos.
+# Cada salida se apaga sola por firmware (tope duro) aunque se caiga la red.
+# Compilar y subir:  esphome run nodo-fondo.yaml
+
+esphome:
+  name: nodo-fondo
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          // Todo apagado al arrancar
+          id(torreta_bomba).turn_off();
+          id(aspersor).turn_off();
+          id(luz).turn_off();
+          id(ultrasonido).turn_off();
+          id(sonido).turn_off();
+
+esp32:
+  board: esp32dev
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # Sin WiFi durante 5 min: reinicia (y todo arranca apagado)
+  reboot_timeout: 5min
+
+mqtt:
+  broker: !secret mqtt_host
+  username: !secret mqtt_user
+  password: !secret mqtt_password
+  discovery: false
+  topic_prefix: nodo-fondo
+  birth_message:
+    topic: nodo-fondo/status
+    payload: online
+  will_message:
+    topic: nodo-fondo/status
+    payload: offline
+
+logger:
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+switch:
+  - platform: gpio
+    name: "torreta_bomba"
+    id: torreta_bomba
+    pin: GPIO25
+    inverted: true              # módulo de relés activo en bajo; quitar si es activo en alto
+    restore_mode: ALWAYS_OFF
+    on_turn_on:                 # tope duro: nunca más de 8 s seguidos
+      - delay: 8s
+      - switch.turn_off: torreta_bomba
+  - platform: gpio
+    name: "aspersor"
+    id: aspersor
+    pin: GPIO26
+    inverted: true              # módulo de relés activo en bajo; quitar si es activo en alto
+    restore_mode: ALWAYS_OFF
+    on_turn_on:                 # tope duro: nunca más de 6 s seguidos
+      - delay: 6s
+      - switch.turn_off: aspersor
+  - platform: gpio
+    name: "luz"
+    id: luz
+    pin: GPIO27
+    inverted: true              # módulo de relés activo en bajo; quitar si es activo en alto
+    restore_mode: ALWAYS_OFF
+    on_turn_on:                 # tope duro: nunca más de 10 s seguidos
+      - delay: 10s
+      - switch.turn_off: luz
+  - platform: gpio
+    name: "ultrasonido"
+    id: ultrasonido
+    pin: GPIO14
+    inverted: true              # módulo de relés activo en bajo; quitar si es activo en alto
+    restore_mode: ALWAYS_OFF
+    on_turn_on:                 # tope duro: nunca más de 10 s seguidos
+      - delay: 10s
+      - switch.turn_off: ultrasonido
+  - platform: gpio
+    name: "sonido"
+    id: sonido
+    pin: GPIO12
+    inverted: true              # módulo de relés activo en bajo; quitar si es activo en alto
+    restore_mode: ALWAYS_OFF
+    on_turn_on:                 # tope duro: nunca más de 5 s seguidos
+      - delay: 5s
+      - switch.turn_off: sonido
+
+# Servos de la(s) torreta(s). Fuente propia de 5-6 V; GND común con el ESP32.
+output:
+  - platform: ledc
+    id: torreta_pan_pwm
+    pin: GPIO18
+    frequency: 50 Hz
+  - platform: ledc
+    id: torreta_tilt_pwm
+    pin: GPIO19
+    frequency: 50 Hz
+
+servo:
+  - id: torreta_pan_servo
+    output: torreta_pan_pwm
+    min_level: 2.5%             # 0.5 ms
+    max_level: 12.5%            # 2.5 ms
+    auto_detach_time: 2s        # suelta el servo tras moverse: sin zumbido ni calor
+    transition_length: 150ms
+  - id: torreta_tilt_servo
+    output: torreta_tilt_pwm
+    min_level: 2.5%             # 0.5 ms
+    max_level: 12.5%            # 2.5 ms
+    auto_detach_time: 2s        # suelta el servo tras moverse: sin zumbido ni calor
+    transition_length: 150ms
+
+# Ángulo 0-180 recibido por MQTT en <nodo>/number/<nombre>/command
+number:
+  - platform: template
+    name: "torreta_pan"
+    id: torreta_pan
+    min_value: 0
+    max_value: 180
+    step: 0.5
+    initial_value: 90
+    optimistic: true
+    set_action:
+      - servo.write:
+          id: torreta_pan_servo
+          level: !lambda 'return (x / 90.0) - 1.0;'   # 0..180 -> -1..1
+  - platform: template
+    name: "torreta_tilt"
+    id: torreta_tilt
+    min_value: 0
+    max_value: 180
+    step: 0.5
+    initial_value: 90
+    optimistic: true
+    set_action:
+      - servo.write:
+          id: torreta_tilt_servo
+          level: !lambda 'return (x / 90.0) - 1.0;'   # 0..180 -> -1..1
+
+# Sonido opcional: módulo DFPlayer Mini con el bufido en la microSD (001.mp3).
+uart:
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+  baud_rate: 9600
+dfplayer:
+  on_finished_playback:
+    then:
+      - switch.turn_off: sonido

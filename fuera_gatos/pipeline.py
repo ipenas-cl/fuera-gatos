@@ -18,8 +18,29 @@ from .zones import assign_zones
 log = logging.getLogger(__name__)
 
 
-def build_detector(cfg: AppConfig):
+def build_bus(cfg: AppConfig, simulate: bool = False):
+    """Cliente MQTT si la configuración lo necesita; FakeBus en simulación."""
     d = cfg.detector
+    needed = d.backend == "frigate" or any(x.type.startswith("mqtt") for x in cfg.deterrents.values()) \
+        or any(x.type.startswith("mqtt") for x in cfg.sensors.values())
+    if not needed:
+        return None
+    if simulate:
+        from .mqtt import FakeBus
+
+        return FakeBus()
+    from .mqtt import MqttBus
+
+    return MqttBus(cfg.mqtt.host, cfg.mqtt.port, cfg.mqtt.username or None,
+                   cfg.mqtt.password or None, cfg.mqtt.client_id)
+
+
+def build_detector(cfg: AppConfig, bus=None):
+    d = cfg.detector
+    if d.backend == "frigate":
+        from .detection.frigate import FrigateDetector
+
+        return FrigateDetector(bus, camera=d.camera, topic=d.topic, min_score=d.confidence)
     if d.backend == "yolo":
         from .detection.yolo import YoloDetector
 
@@ -44,9 +65,10 @@ def split_detections(cfg: AppConfig, raw):
 
 
 def run(cfg: AppConfig, simulate: bool = False, max_frames: int | None = None,
-        detector=None, camera=None) -> int:
-    deterrents = build_deterrents(cfg.deterrents, simulate=simulate)
-    sensors = build_sensors(cfg.sensors, simulate=simulate)
+        detector=None, camera=None, bus=None) -> int:
+    bus = bus or build_bus(cfg, simulate=simulate)
+    deterrents = build_deterrents(cfg.deterrents, simulate=simulate, bus=bus)
+    sensors = build_sensors(cfg.sensors, simulate=simulate, bus=bus)
     event_log = EventLog(cfg.events)
     notifier = Notifier(cfg.notify)
     latest = {"frame": None}
@@ -75,7 +97,7 @@ def run(cfg: AppConfig, simulate: bool = False, max_frames: int | None = None,
         zone_deterrents={z.name: z.deterrents for z in cfg.zones},
         guards=guards_from_sensors(sensors),
     )
-    detector = detector or build_detector(cfg)
+    detector = detector or build_detector(cfg, bus)
     camera = camera or open_camera(cfg.camera)
 
     stop = {"flag": False}
@@ -112,5 +134,7 @@ def run(cfg: AppConfig, simulate: bool = False, max_frames: int | None = None,
         for sensor in sensors.values():
             sensor.close()
         camera.close()
+        if bus is not None:
+            bus.close()
         log.info("fuera-gatos detenido tras %d cuadros", frames)
     return 0

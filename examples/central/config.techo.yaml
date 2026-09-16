@@ -1,0 +1,102 @@
+# Modo centralizado: la laptop del armario corre Frigate + Mosquitto + fuera-gatos.
+# Esta instancia atiende la cámara "techo" de Frigate y comanda el nodo ESP32 "nodo-techo".
+
+mqtt:
+  host: localhost            # Mosquitto en la misma laptop
+  port: 1883
+  client_id: fuera-gatos-techo
+
+camera:
+  source: none               # el video lo procesa Frigate; aquí solo se marca el ritmo
+  width: 640                 # resolución de detección configurada en Frigate (detect.width/height)
+  height: 480
+  fps: 5
+
+detector:
+  backend: frigate
+  camera: techo
+  topic: frigate/events
+  confidence: 0.55
+  target_labels: [cat]
+  suppress_labels: [person, dog]
+
+zones:
+  include:
+    - name: techo_propio
+      polygon: [[150, 60], [490, 60], [560, 480], [80, 480]]
+    - name: techo_vecino_izq
+      polygon: [[0, 60], [150, 60], [80, 480], [0, 480]]
+      deterrents: []
+    - name: techo_vecino_der
+      polygon: [[490, 60], [640, 60], [640, 480], [560, 480]]
+      deterrents: []
+
+controller:
+  confirm_frames: 4
+  confirm_window_s: 2.5
+  cooldown_s: 15
+  max_activations_per_hour: 20
+  escalate_if_return_within_s: 300
+  escalation:
+    - name: nivel_1
+      deterrents: [torreta_a, luz]
+      duration_s: 4
+    - name: nivel_2
+      deterrents: [torreta_a, torreta_b, luz]
+      duration_s: 5
+  quiet_hours:
+    start: "22:00"
+    end: "07:00"
+    allowed: [torreta_a, torreta_b, luz]
+
+deterrents:
+  torreta_a:
+    type: mqtt_turret
+    max_on_s: 8
+    pulse_on_s: 0.6
+    pulse_off_s: 0.3
+    lead_s: 0.3
+    topics:
+      pan:   nodo-techo/number/torreta_a_pan/command
+      tilt:  nodo-techo/number/torreta_a_tilt/command
+      valve: nodo-techo/switch/torreta_a_bomba/command
+    calibration:                # ajustar con `fuera-gatos aim --name torreta_a`
+      pan:  [[0, 150], [640, 30]]
+      tilt: [[60, 70], [480, 30]]
+    limits: { pan: [55, 125], tilt: [25, 70] }
+    rest_angles: [90, 50]
+  torreta_b:
+    type: mqtt_turret
+    max_on_s: 8
+    pulse_on_s: 0.6
+    pulse_off_s: 0.3
+    lead_s: 0.3
+    topics:
+      pan:   nodo-techo/number/torreta_b_pan/command
+      tilt:  nodo-techo/number/torreta_b_tilt/command
+      valve: nodo-techo/switch/torreta_b_bomba/command
+    calibration:                # ajustar con `fuera-gatos aim --name torreta_b`
+      pan:  [[0, 150], [640, 30]]
+      tilt: [[60, 70], [480, 30]]
+    limits: { pan: [55, 125], tilt: [25, 70] }
+    rest_angles: [90, 50]
+  luz:
+    type: mqtt_switch
+    topic: nodo-techo/switch/luz/command
+    max_on_s: 10
+
+sensors:
+  nivel_estanque:
+    type: mqtt_binary          # binary_sensor "estanque_vacio" del nodo: ON = vacío
+    topic: nodo-techo/binary_sensor/estanque_vacio/state
+    empty_payload: "ON"
+    gates: [torreta_a, torreta_b]
+
+events:
+  log_file: data/techo/events.jsonl
+  snapshots_dir: data/techo/snapshots
+  save_snapshots: true
+  snapshot_url: http://localhost:5000/api/techo/latest.jpg?h=480
+
+notify:
+  telegram: { enabled: false, token: "", chat_id: "" }

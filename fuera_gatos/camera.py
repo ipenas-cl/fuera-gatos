@@ -106,7 +106,19 @@ class SyntheticCamera(Camera):
         return frame
 
 
+class NullCamera(Camera):
+    """Sin video local (el detector es Frigate). Devuelve un cuadro vacío para marcar el ritmo."""
+
+    def __init__(self, cfg: CameraConfig):
+        self._frame = np.zeros((max(1, cfg.height), max(1, cfg.width), 3), dtype=np.uint8)
+
+    def read(self) -> np.ndarray | None:
+        return self._frame
+
+
 def open_camera(cfg: CameraConfig) -> Camera:
+    if cfg.source == "none":
+        return NullCamera(cfg)
     if cfg.source == "picamera":
         return PiCamera(cfg)
     if cfg.source in ("usb", "rtsp"):

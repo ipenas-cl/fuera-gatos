@@ -21,6 +21,8 @@ yolo = ["ultralytics>=8.1", "opencv-python-headless>=4.8"]
 opencv = ["opencv-python-headless>=4.8"]
 # Salidas GPIO de la Raspberry Pi.
 gpio = ["gpiozero>=2.0", "smbus2>=0.4"]
+# Modo centralizado: eventos de Frigate y nodos ESP32 por MQTT.
+mqtt = ["paho-mqtt>=1.6"]
 dev = ["pytest>=7"]
 
 [project.scripts]

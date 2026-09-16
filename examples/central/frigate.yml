@@ -1,0 +1,103 @@
+# Configuración de Frigate para las tres cámaras IP (RTSP) de la casa.
+# Detecta gato, persona y perro; graba 24/7 con retención corta y guarda clips de eventos.
+mqtt:
+  host: mosquitto
+  user: fueragatos
+  password: clave-mqtt
+
+detectors:
+  # Laptop con Intel de 6.ª generación o más nueva: usar la GPU integrada.
+  ov:
+    type: openvino
+    device: GPU
+  # Si el CPU es viejo o AMD, comentar lo anterior y usar Coral USB:
+  # coral:
+  #   type: edgetpu
+  #   device: usb
+
+model:
+  width: 320
+  height: 320
+
+ffmpeg:
+  hwaccel_args: preset-vaapi     # decodificación por hardware en Intel; quitar si falla
+
+objects:
+  track: [cat, person, dog]
+  filters:
+    cat:
+      min_score: 0.5
+      threshold: 0.6
+      min_area: 800
+
+record:
+  enabled: true
+  retain:
+    days: 3                      # video continuo: 3 días
+    mode: motion
+  alerts:
+    retain:
+      days: 30                   # clips con persona: 30 días
+  detections:
+    retain:
+      days: 10                   # clips con gato: 10 días
+
+snapshots:
+  enabled: true
+  retain:
+    default: 10
+
+cameras:
+  frente:
+    ffmpeg:
+      inputs:
+        - path: rtsp://usuario:clave@192.168.1.21:554/stream2   # subflujo 640x480 para detectar
+          roles: [detect]
+        - path: rtsp://usuario:clave@192.168.1.21:554/stream1   # flujo principal para grabar
+          roles: [record]
+    detect:
+      width: 640
+      height: 480
+      fps: 5
+    motion:
+      mask:
+        - 0,0,640,60             # vereda y calle: ni detección ni grabación por movimiento
+    zones:
+      terreno:
+        coordinates: 0,60,640,60,640,480,0,480
+    review:
+      alerts:
+        labels: [person]
+        required_zones: [terreno]
+
+  fondo:
+    ffmpeg:
+      inputs:
+        - path: rtsp://usuario:clave@192.168.1.22:554/stream2
+          roles: [detect]
+        - path: rtsp://usuario:clave@192.168.1.22:554/stream1
+          roles: [record]
+    detect:
+      width: 640
+      height: 480
+      fps: 5
+    review:
+      alerts:
+        labels: [person]
+
+  techo:
+    ffmpeg:
+      inputs:
+        - path: rtsp://usuario:clave@192.168.1.23:554/stream2
+          roles: [detect]
+        - path: rtsp://usuario:clave@192.168.1.23:554/stream1
+          roles: [record]
+    detect:
+      width: 640
+      height: 480
+      fps: 5
+    motion:
+      mask:
+        # patios y ventanas de los vecinos: ajustar con la vista de Frigate
+        - 0,300,120,300,120,480,0,480
+        - 520,300,640,300,640,480,520,480
