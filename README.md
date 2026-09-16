@@ -65,6 +65,9 @@ Lo mínimo:
 Con una Pi Zero 2 W también funciona usando el detector por movimiento
 (`backend: motion`), menos preciso pero suficiente en zonas acotadas.
 
+La lista de materiales completa, por ubicación y con el consolidado de compra, está en
+[docs/materiales.md](docs/materiales.md).
+
 ## Instalación (Raspberry Pi OS)
 
 ```bash
