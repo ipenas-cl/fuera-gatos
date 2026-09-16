@@ -1,0 +1,58 @@
+# Cámara 1: antejardín + borde del techo delantero.
+# Instalar bajo el alero, mirando hacia la calle en diagonal descendente.
+# Coordenadas orientativas para 640x480; ajustar con una captura real.
+
+camera:
+  source: picamera
+  width: 640
+  height: 480
+  fps: 8
+
+detector:
+  backend: yolo
+  model: yolov8n_ncnn_model
+  confidence: 0.45
+  target_labels: [cat]
+  suppress_labels: [person, dog]
+
+zones:
+  include:
+    # Franja superior: techo compartido. Solo luz, ultrasonido y sonido.
+    - name: techo_frente
+      polygon: [[0, 0], [640, 0], [640, 140], [0, 140]]
+      deterrents: [luz, ultrasonido, sonido]
+    # Antejardín (tierra y plantas): todo permitido.
+    - name: antejardin
+      polygon: [[40, 140], [600, 140], [640, 480], [0, 480]]
+    # Basura junto a la entrada: todo permitido.
+    - name: basura
+      polygon: [[0, 300], [180, 300], [180, 480], [0, 480]]
+
+controller:
+  confirm_frames: 3
+  confirm_window_s: 2.0
+  cooldown_s: 30
+  max_activations_per_hour: 12
+  escalate_if_return_within_s: 300
+  escalation:
+    - name: nivel_1
+      deterrents: [luz, sonido]
+      duration_s: 4
+    - name: nivel_2
+      deterrents: [luz, ultrasonido, aspersor]
+      duration_s: 3
+  quiet_hours:
+    start: "22:00"
+    end: "07:00"
+    allowed: [luz, ultrasonido, aspersor]
+
+deterrents:
+  luz:        { type: relay, pin: 17, active_high: false, max_on_s: 10 }
+  aspersor:   { type: relay, pin: 27, active_high: false, max_on_s: 5 }
+  ultrasonido: { type: relay, pin: 22, active_high: false, max_on_s: 10 }
+  sonido:     { type: sound, files: [sounds/hiss.wav, sounds/air.wav], player: aplay }
+
+events:
+  log_file: data/frente/events.jsonl
+  snapshots_dir: data/frente/snapshots
+  save_snapshots: true

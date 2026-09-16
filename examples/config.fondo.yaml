@@ -1,0 +1,60 @@
+# Cámara 2: jardín trasero + galpón + borde del techo trasero.
+# Instalar en la pared trasera de la casa (o en el galpón mirando a la casa).
+# Coordenadas orientativas para 640x480; ajustar con una captura real.
+
+camera:
+  source: picamera
+  width: 640
+  height: 480
+  fps: 8
+
+detector:
+  backend: yolo
+  model: yolov8n_ncnn_model
+  confidence: 0.45
+  target_labels: [cat]
+  suppress_labels: [person, dog]
+
+zones:
+  include:
+    - name: techo_fondo
+      polygon: [[0, 0], [640, 0], [640, 130], [0, 130]]
+      deterrents: [luz, ultrasonido, sonido]
+    - name: jardin_trasero
+      polygon: [[0, 130], [640, 130], [640, 480], [0, 480]]
+    # Techo del galpón: los gatos lo usan de escalera. Sin agua para no mojar
+    # lo que haya guardado.
+    - name: galpon
+      polygon: [[420, 130], [640, 130], [640, 300], [420, 300]]
+      deterrents: [luz, ultrasonido, sonido]
+
+controller:
+  confirm_frames: 3
+  confirm_window_s: 2.0
+  cooldown_s: 30
+  max_activations_per_hour: 12
+  escalate_if_return_within_s: 300
+  escalation:
+    - name: nivel_1
+      deterrents: [luz, sonido]
+      duration_s: 4
+    - name: nivel_2
+      deterrents: [luz, ultrasonido, aspersor]
+      duration_s: 3
+  quiet_hours:
+    start: "22:00"
+    end: "07:00"
+    allowed: [luz, ultrasonido, aspersor]
+
+deterrents:
+  # Segunda Pi o segundo juego de relés: pines distintos a los del frente
+  # si ambas cámaras cuelgan de la misma Pi.
+  luz:        { type: relay, pin: 5,  active_high: false, max_on_s: 10 }
+  aspersor:   { type: relay, pin: 6,  active_high: false, max_on_s: 5 }
+  ultrasonido: { type: relay, pin: 13, active_high: false, max_on_s: 10 }
+  sonido:     { type: sound, files: [sounds/hiss.wav, sounds/air.wav], player: aplay }
+
+events:
+  log_file: data/fondo/events.jsonl
+  snapshots_dir: data/fondo/snapshots
+  save_snapshots: true

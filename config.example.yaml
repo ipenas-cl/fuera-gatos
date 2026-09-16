@@ -1,0 +1,88 @@
+# Configuración de fuera-gatos.
+# Copiar a config.yaml y ajustar. Todas las duraciones están en segundos.
+
+camera:
+  source: picamera        # picamera | usb | rtsp | synthetic
+  device: 0               # índice de la cámara USB, o URL rtsp:// si source=rtsp
+  width: 640
+  height: 480
+  fps: 8                  # cuadros por segundo que se analizan (bajo = menos CPU)
+  rotate: 0               # 0, 90, 180 o 270
+
+detector:
+  backend: yolo           # yolo (recomendado) | motion (sin red neuronal, menos preciso)
+  model: yolov8n.pt       # se descarga solo la primera vez; en Pi conviene exportar a NCNN
+  confidence: 0.45
+  target_labels: [cat]    # qué activa el sistema
+  # Si aparece alguna de estas etiquetas en el cuadro NO se activa nada
+  # (evita rociar a personas o al perro de la casa).
+  suppress_labels: [person, dog]
+  motion:                 # solo para backend=motion
+    threshold: 25         # sensibilidad al cambio de píxel (0-255)
+    min_area: 1500        # área mínima del bulto en px² (descarta pájaros, hojas)
+    max_area: 60000       # área máxima (descarta personas y autos)
+
+zones:
+  # Polígonos (en píxeles de la imagen) donde SÍ se actúa.
+  # Lista vacía = todo el cuadro. Un gato se considera "dentro" si la base
+  # de su cuadro (donde apoya las patas) cae dentro del polígono.
+  # `deterrents` limita qué disuasores se pueden usar en esa zona (si se omite,
+  # todos los del nivel). En un techo compartido con los vecinos: nunca agua.
+  include:
+    - name: basura
+      polygon: [[0, 200], [300, 200], [300, 480], [0, 480]]
+    - name: jardin
+      polygon: [[300, 150], [640, 150], [640, 480], [300, 480]]
+    - name: techo
+      polygon: [[0, 0], [640, 0], [640, 150], [0, 150]]
+      deterrents: [luz, ultrasonido, sonido]
+
+controller:
+  confirm_frames: 3            # detecciones dentro de la ventana antes de actuar
+  confirm_window_s: 2.0
+  cooldown_s: 30               # pausa mínima entre activaciones
+  max_activations_per_hour: 12 # tope para no desperdiciar agua ni molestar vecinos
+  escalate_if_return_within_s: 300  # si el gato vuelve antes de esto, sube de nivel
+  escalation:
+    - name: nivel_1
+      deterrents: [luz, sonido]
+      duration_s: 4
+    - name: nivel_2
+      deterrents: [luz, ultrasonido, aspersor]
+      duration_s: 3
+  quiet_hours:                 # de noche, nada de sonido audible
+    start: "22:00"
+    end: "07:00"
+    allowed: [luz, ultrasonido, aspersor]
+
+deterrents:
+  luz:
+    type: relay
+    pin: 17                    # numeración BCM
+    active_high: true
+    max_on_s: 10
+  aspersor:
+    type: relay
+    pin: 27
+    active_high: true
+    max_on_s: 5                # tope duro: la electroválvula nunca queda abierta más
+  ultrasonido:
+    type: relay
+    pin: 22
+    active_high: true
+    max_on_s: 10
+  sonido:
+    type: sound
+    files: [sounds/hiss.wav, sounds/air.wav]
+    player: aplay              # aplay | paplay | ffplay
+
+events:
+  log_file: data/events.jsonl
+  snapshots_dir: data/snapshots
+  save_snapshots: true
+
+notify:
+  telegram:
+    enabled: false
+    token: ""
+    chat_id: ""

@@ -1,0 +1,15 @@
+[Unit]
+Description=fuera-gatos: detección y disuasión humanitaria de gatos
+After=network.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__DIR__
+ExecStart=__DIR__/.venv/bin/fuera-gatos run -c __DIR__/config.yaml
+Restart=on-failure
+RestartSec=5
+# Si el proceso muere, los relés se apagan solos por el tope max_on_s de cada disuasor.
+
+[Install]
+WantedBy=multi-user.target

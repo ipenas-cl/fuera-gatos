@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fuera-gatos"
+version = "0.1.0"
+description = "Detección de gatos con cámara y disuasión humanitaria (luz, sonido, ultrasonido, agua) para proteger el terreno y la basura."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.22",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+# Detección con red neuronal (YOLO). Pesado; recomendado en Raspberry Pi 4/5.
+yolo = ["ultralytics>=8.1", "opencv-python-headless>=4.8"]
+# Cámara USB / RTSP y guardado de capturas.
+opencv = ["opencv-python-headless>=4.8"]
+# Salidas GPIO de la Raspberry Pi.
+gpio = ["gpiozero>=2.0"]
+dev = ["pytest>=7"]
+
+[project.scripts]
+fuera-gatos = "fuera_gatos.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["fuera_gatos*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

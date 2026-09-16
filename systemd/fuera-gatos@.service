@@ -1,0 +1,16 @@
+# Instancia por cámara: fuera-gatos@frente, fuera-gatos@fondo.
+# Usa el archivo config.<instancia>.yaml del directorio del proyecto.
+[Unit]
+Description=fuera-gatos (%i): detección y disuasión humanitaria de gatos
+After=network.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__DIR__
+ExecStart=__DIR__/.venv/bin/fuera-gatos run -c __DIR__/config.%i.yaml
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
