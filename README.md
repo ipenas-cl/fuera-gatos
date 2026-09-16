@@ -92,15 +92,17 @@ pytest
 
 ## Terreno con antejardín, techo compartido y jardín trasero
 
-Si los gatos circulan por el techo y bajan a ambos jardines, hacen falta dos cámaras
-(frente y fondo), cada una con sus zonas y sus relés. Hay configuraciones de ejemplo
-en `examples/` y una guía con la ubicación de cámaras, aspersores y zonas en
-[docs/terreno.md](docs/terreno.md). Cada cámara corre como un servicio aparte:
+Si los gatos circulan por el techo y bajan a ambos jardines, hacen falta tres cámaras:
+frente, fondo y techo, cada una con sus zonas y sus relés. Hay configuraciones de
+ejemplo en `examples/`, una guía con la ubicación de cámaras, torretas y zonas en
+[docs/terreno.md](docs/terreno.md) y otra para el techo con agua autónoma (estanque,
+bomba y flotador) en [docs/techo.md](docs/techo.md). Cada cámara corre como un servicio:
 
 ```bash
 cp examples/config.frente.yaml config.frente.yaml
 cp examples/config.fondo.yaml config.fondo.yaml
-sudo systemctl enable --now fuera-gatos@frente fuera-gatos@fondo
+cp examples/config.techo.yaml config.techo.yaml
+sudo systemctl enable --now fuera-gatos@frente fuera-gatos@fondo fuera-gatos@techo
 ```
 
 ## Configuración
@@ -118,6 +120,8 @@ Todo está en `config.yaml` (ver `config.example.yaml`, comentado). Lo más impo
   grado, límites y ráfagas), relés (`relay`, con `pulse_on_s`/`pulse_off_s` opcionales)
   o sonido (`sound`, archivos WAV).
 * **`detector.suppress_labels`**: etiquetas que bloquean todo (`person`, `dog`).
+* **`sensors`**: flotador del estanque (`float_switch`) que custodia una lista de
+  disuasores (`gates`): sin agua no se activan y llega un aviso para rellenar.
 
 ### Detector
 
@@ -141,14 +145,15 @@ fuera_gatos/
   pipeline.py     bucle cámara -> detector -> zonas -> controlador
   controller.py   máquina de estados (confirmación, escalado, cooldown, supresión)
   zones.py        polígonos de actuación
+  sensors.py      flotador de nivel del estanque
   camera.py       picamera2, OpenCV (USB/RTSP) o sintética
   detection/      yolo.py, motion.py, scripted.py
   deterrents/     turret.py (pan/tilt + bomba), servo.py (PCA9685/gpiozero),
                   relay.py (GPIO), sound.py, simulated.py
   events.py       JSONL + capturas
   notify.py       Telegram
-docs/             hardware.md, humanitario.md, terreno.md
-examples/         config.frente.yaml, config.fondo.yaml
+docs/             hardware.md, humanitario.md, terreno.md, techo.md
+examples/         config.frente.yaml, config.fondo.yaml, config.techo.yaml
 scripts/          install.sh, make_sounds.py
 systemd/          fuera-gatos.service (una cámara), fuera-gatos@.service (varias)
 tests/            pytest (lógica pura, sin hardware)

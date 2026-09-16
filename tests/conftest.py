@@ -54,7 +54,7 @@ def person():
 
 @pytest.fixture
 def env():
-    def _make(hour: int = 12, zone_deterrents=None, **overrides):
+    def _make(hour: int = 12, zone_deterrents=None, guards=None, **overrides):
         clock = FakeClock(hour=hour)
         dets = {n: LogDeterrent(n, use_timer=False, max_on_s=5.0) for n in ("luz", "sonido", "aspersor")}
         events = []
@@ -62,6 +62,7 @@ def env():
             make_cfg(**overrides), dets, ["cat"], ["person", "dog"],
             clock=clock, wallclock=clock.wall, on_event=events.append,
             zone_deterrents=zone_deterrents,
+            guards=guards,
         )
         return ctrl, dets, events, clock
 

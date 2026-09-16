@@ -23,7 +23,8 @@ basura junto a la entrada.
 
 | Lugar | Por qué vienen | Disuasores | Zona en la configuración |
 |---|---|---|---|
-| Techo (frente y fondo) | Camino de paso entre casas | Luz, ultrasonido, sonido. Agua solo si los límites de la torreta garantizan que el chorro cae en tu tramo de techo y no en canaletas ni en el del vecino | `techo_frente`, `techo_fondo` con `deterrents: [luz, ultrasonido, sonido]` (agregar `torreta` si aplica) |
+| Techo | Camino de paso entre casas | Cámara 3 en la cumbrera y dos torretas con agua autónoma (estanque + bomba), limitadas por las medianeras. Ver [techo.md](techo.md) | `techo_propio` con agua; `techo_vecino_*` solo registro |
+| Borde del techo visto desde abajo | Lo que ven las cámaras 1 y 2 | Luz, ultrasonido, sonido; el agua la ponen las torretas de arriba | `techo_frente`, `techo_fondo` con `deterrents: [luz, ultrasonido, sonido]` |
 | Antejardín | Tierra suelta para enterrar | Torreta desde la primera visita, luz; aspersor fijo de respaldo | `antejardin` |
 | Basura junto a la entrada | Comida | Torreta, luz; además tapa con traba | `basura` |
 | Jardín trasero | Tierra y refugio | Torreta, luz, aspersor fijo | `jardin_trasero` |
@@ -38,7 +39,7 @@ Con cinco gatos conviene un `cooldown_s` corto (15 s) y `max_activations_per_hou
 alto (20): suelen bajar de a varios y el segundo no debe encontrar el sistema en
 pausa.
 
-## Dos cámaras, uno o dos equipos
+## Tres cámaras, uno o más equipos
 
 * **Opción A, una Raspberry Pi con dos cámaras**: la Pi 5 tiene dos conectores CSI.
   Se ejecutan dos instancias con configuraciones distintas (`config.frente.yaml`,
@@ -54,8 +55,9 @@ En cualquier caso, en el equipo:
 ```bash
 cp examples/config.frente.yaml config.frente.yaml
 cp examples/config.fondo.yaml config.fondo.yaml
+cp examples/config.techo.yaml config.techo.yaml
 # ajustar pines, zonas y fuente de cámara de cada uno
-sudo systemctl enable --now fuera-gatos@frente fuera-gatos@fondo
+sudo systemctl enable --now fuera-gatos@frente fuera-gatos@fondo fuera-gatos@techo
 journalctl -u 'fuera-gatos*' -f
 ```
 

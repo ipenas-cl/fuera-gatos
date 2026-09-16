@@ -1,0 +1,94 @@
+# Cámara 3: techo. Montada en la cumbrera o en un mástil, mirando a lo largo
+# del techo. Agua autónoma: estanque + bomba + flotador, sin manguera desde abajo.
+# Coordenadas orientativas para 640x480; ajustar con una captura real.
+
+camera:
+  source: picamera
+  width: 640
+  height: 480
+  fps: 6
+
+detector:
+  backend: yolo
+  model: yolov8n_ncnn_model
+  confidence: 0.55          # más exigente: el chorro llega lejos y hay gatos de vecinos
+  target_labels: [cat]
+  suppress_labels: [person, dog]
+
+zones:
+  include:
+    # Tu tramo de techo, entre las dos medianeras. Único lugar con agua.
+    - name: techo_propio
+      polygon: [[150, 60], [490, 60], [560, 480], [80, 480]]
+    # Tramos de los vecinos: solo se registra el paso, no se actúa.
+    - name: techo_vecino_izq
+      polygon: [[0, 60], [150, 60], [80, 480], [0, 480]]
+      deterrents: []
+    - name: techo_vecino_der
+      polygon: [[490, 60], [640, 60], [640, 480], [560, 480]]
+      deterrents: []
+
+controller:
+  confirm_frames: 4          # una detección más que abajo: menos falsos disparos
+  confirm_window_s: 2.5
+  cooldown_s: 15
+  max_activations_per_hour: 20
+  escalate_if_return_within_s: 300
+  escalation:
+    - name: nivel_1
+      deterrents: [torreta_a, luz]
+      duration_s: 4
+    - name: nivel_2
+      deterrents: [torreta_a, torreta_b, luz]
+      duration_s: 5
+  quiet_hours:
+    start: "22:00"
+    end: "07:00"
+    allowed: [torreta_a, torreta_b, luz]
+
+deterrents:
+  # Dos torretas, una por extremo del tramo. Los límites de pan se fijan en las
+  # medianeras y el tilt obliga a apuntar hacia abajo, a tu propia vertiente.
+  torreta_a:
+    type: turret
+    valve_pin: 27            # relé de la bomba A
+    active_high: false
+    max_on_s: 6
+    pulse_on_s: 0.6
+    pulse_off_s: 0.3
+    lead_s: 0.35
+    servo: { driver: pca9685, pan_channel: 0, tilt_channel: 1 }
+    calibration:
+      pan:  [[0, 150], [640, 30]]
+      tilt: [[60, 70], [480, 30]]
+    limits: { pan: [55, 125], tilt: [25, 70] }
+    rest_angles: [90, 45]
+  torreta_b:
+    type: turret
+    valve_pin: 22            # relé de la bomba B
+    active_high: false
+    max_on_s: 6
+    pulse_on_s: 0.6
+    pulse_off_s: 0.3
+    lead_s: 0.35
+    servo: { driver: pca9685, pan_channel: 2, tilt_channel: 3 }
+    calibration:
+      pan:  [[0, 150], [640, 30]]
+      tilt: [[60, 70], [480, 30]]
+    limits: { pan: [55, 125], tilt: [25, 70] }
+    rest_angles: [90, 45]
+  luz: { type: relay, pin: 17, active_high: false, max_on_s: 10 }
+
+sensors:
+  # Flotador en el estanque. Cuando está vacío, las torretas no se activan
+  # (la bomba no trabaja en seco) y llega un aviso para rellenar.
+  nivel_estanque:
+    type: float_switch
+    pin: 16
+    empty_when: low          # low: el flotador cierra a masa cuando NO hay agua
+    gates: [torreta_a, torreta_b]
+
+events:
+  log_file: data/techo/events.jsonl
+  snapshots_dir: data/techo/snapshots
+  save_snapshots: true

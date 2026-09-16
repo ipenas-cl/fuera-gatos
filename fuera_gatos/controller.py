@@ -90,6 +90,7 @@ class Controller:
         wallclock: Callable[[], datetime] = datetime.now,
         on_event: Callable[[Event], None] | None = None,
         zone_deterrents: dict[str, list[str] | None] | None = None,
+        guards: dict[str, Callable[[], bool]] | None = None,
     ):
         if not cfg.escalation:
             raise ValueError("Se necesita al menos un nivel de escalado")
@@ -102,6 +103,9 @@ class Controller:
         self.on_event = on_event or (lambda e: None)
         # zona -> disuasores permitidos (None = todos)
         self.zone_deterrents = zone_deterrents or {}
+        # disuasor -> función que dice si tiene recurso (estanque con agua, etc.)
+        self.guards = guards or {}
+        self._unavailable: set[str] = set()
 
         self.state = State.IDLE
         self._confirm_hits: deque[float] = deque()
@@ -240,7 +244,26 @@ class Controller:
             allowed_in_zone = self.zone_deterrents.get(z)
             if allowed_in_zone is not None:
                 names = [n for n in names if n in allowed_in_zone]
-        return names
+        return self._with_resources(names, targets)
+
+    def _with_resources(self, names: list[str], targets: list[Detection]) -> list[str]:
+        """Quita los disuasores sin recurso y avisa una vez cuando uno se queda sin él."""
+        available, missing = [], []
+        for n in names:
+            guard = self.guards.get(n)
+            try:
+                ok = guard() if guard else True
+            except Exception:
+                log.exception("Fallo leyendo el sensor de '%s'; se asume sin recurso", n)
+                ok = False
+            (available if ok else missing).append(n)
+        newly = [n for n in missing if n not in self._unavailable]
+        recovered = [n for n in self._unavailable if n in available]
+        self._unavailable = (self._unavailable | set(missing)) - set(recovered)
+        if newly:
+            self.on_event(Event("resource_empty", self.clock(), deterrents=newly, detections=targets,
+                                reason=f"sin recurso para {', '.join(newly)} (estanque vacío)"))
+        return available
 
     def _activate(self, now: float, targets: list[Detection]) -> None:
         self._confirm_hits.clear()
@@ -259,7 +282,7 @@ class Controller:
             self.state = State.COOLDOWN
             self._cooldown_until = now + self.cfg.cooldown_s
             self.on_event(Event("rate_limited", now, level=level.name, detections=targets,
-                                reason="ningún disuasor permitido (horario silencioso o zona)"))
+                                reason="ningún disuasor permitido (horario silencioso, zona o sin recurso)"))
             return
 
         started = []

@@ -12,6 +12,7 @@ from .detection.motion import MotionDetector
 from .deterrents import build_deterrents
 from .events import EventLog
 from .notify import Notifier
+from .sensors import build_sensors, guards_from_sensors
 from .zones import assign_zones
 
 log = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ def split_detections(cfg: AppConfig, raw):
 def run(cfg: AppConfig, simulate: bool = False, max_frames: int | None = None,
         detector=None, camera=None) -> int:
     deterrents = build_deterrents(cfg.deterrents, simulate=simulate)
+    sensors = build_sensors(cfg.sensors, simulate=simulate)
     event_log = EventLog(cfg.events)
     notifier = Notifier(cfg.notify)
     latest = {"frame": None}
@@ -58,6 +60,9 @@ def run(cfg: AppConfig, simulate: bool = False, max_frames: int | None = None,
                 f"Gato detectado en {', '.join(zones)}. Activado: {', '.join(ev.deterrents)} ({ev.level})",
                 snap,
             )
+        elif ev.kind == "resource_empty":
+            log.warning("%s", ev.reason)
+            notifier.send(f"Atención: {ev.reason}. Hay que rellenar el estanque.")
         elif ev.kind in ("suppressed", "rate_limited"):
             log.info("Sin acción: %s", ev.reason)
 
@@ -68,6 +73,7 @@ def run(cfg: AppConfig, simulate: bool = False, max_frames: int | None = None,
         suppress_labels=cfg.detector.suppress_labels,
         on_event=on_event,
         zone_deterrents={z.name: z.deterrents for z in cfg.zones},
+        guards=guards_from_sensors(sensors),
     )
     detector = detector or build_detector(cfg)
     camera = camera or open_camera(cfg.camera)
@@ -103,6 +109,8 @@ def run(cfg: AppConfig, simulate: bool = False, max_frames: int | None = None,
                 time.sleep(period - elapsed)
     finally:
         controller.close()
+        for sensor in sensors.values():
+            sensor.close()
         camera.close()
         log.info("fuera-gatos detenido tras %d cuadros", frames)
     return 0

@@ -37,7 +37,7 @@ sudo systemctl daemon-reload
 echo
 echo "Una sola cámara (config.yaml):"
 echo "  sudo systemctl enable --now fuera-gatos"
-echo "Varias cámaras (config.frente.yaml, config.fondo.yaml):"
-echo "  cp examples/config.frente.yaml config.frente.yaml && cp examples/config.fondo.yaml config.fondo.yaml"
-echo "  sudo systemctl enable --now fuera-gatos@frente fuera-gatos@fondo"
+echo "Varias cámaras (config.frente.yaml, config.fondo.yaml, config.techo.yaml):"
+echo "  cp examples/config.frente.yaml config.frente.yaml   # y fondo / techo"
+echo "  sudo systemctl enable --now fuera-gatos@frente fuera-gatos@fondo fuera-gatos@techo"
 echo "Registro:  journalctl -u 'fuera-gatos*' -f"

@@ -83,6 +83,13 @@ class DeterrentConfig:
 
 
 @dataclass
+class SensorConfig:
+    name: str
+    type: str
+    options: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class EventsConfig:
     log_file: str = "data/events.jsonl"
     snapshots_dir: str = "data/snapshots"
@@ -108,6 +115,7 @@ class AppConfig:
     zones: list[ZoneConfig] = field(default_factory=list)
     controller: ControllerConfig = field(default_factory=ControllerConfig)
     deterrents: dict[str, DeterrentConfig] = field(default_factory=dict)
+    sensors: dict[str, SensorConfig] = field(default_factory=dict)
     events: EventsConfig = field(default_factory=EventsConfig)
     notify: NotifyConfig = field(default_factory=NotifyConfig)
 
@@ -200,6 +208,16 @@ def config_from_dict(raw: dict) -> AppConfig:
             if dname not in deterrents:
                 raise ConfigError(f"Zona '{z.name}' permite el disuasor '{dname}' que no está definido")
 
+    sensors: dict[str, SensorConfig] = {}
+    for name, d in _sub(raw, "sensors").items():
+        if not isinstance(d, dict) or "type" not in d:
+            raise ConfigError(f"Sensor '{name}' necesita un campo 'type'")
+        opts = {k: v for k, v in d.items() if k != "type"}
+        for g in opts.get("gates", []):
+            if g not in deterrents:
+                raise ConfigError(f"Sensor '{name}' custodia el disuasor '{g}' que no está definido")
+        sensors[name] = SensorConfig(name=name, type=str(d["type"]), options=opts)
+
     events = _build(EventsConfig, _sub(raw, "events"))
     notify_raw = _sub(raw, "notify")
     notify = NotifyConfig(telegram=_build(TelegramConfig, _sub(notify_raw, "telegram")))
@@ -210,6 +228,7 @@ def config_from_dict(raw: dict) -> AppConfig:
         zones=zones,
         controller=controller,
         deterrents=deterrents,
+        sensors=sensors,
         events=events,
         notify=notify,
     )

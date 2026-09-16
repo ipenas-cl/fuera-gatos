@@ -102,6 +102,15 @@ deterrents:
     files: [sounds/hiss.wav, sounds/air.wav]
     player: aplay              # aplay | paplay | ffplay
 
+sensors:
+  # Opcional: flotador del estanque cuando el agua no viene de la red.
+  # Vacío = los disuasores en `gates` no se activan y llega un aviso.
+  # nivel_estanque:
+  #   type: float_switch
+  #   pin: 16
+  #   empty_when: low
+  #   gates: [torreta]
+
 events:
   log_file: data/events.jsonl
   snapshots_dir: data/snapshots
