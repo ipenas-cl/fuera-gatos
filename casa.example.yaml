@@ -1,0 +1,38 @@
+# Panel de casa (fuera-gatos casa -c casa.yaml): cámaras, timbre, historial e interruptores.
+# Frigate graba y detecta en tu equipo; este panel solo lo muestra y avisa. Nada pasa por la nube.
+server:
+  port: 8080
+  token: "cambia-esta-clave"     # vacía = sin clave (solo si la red es de confianza)
+
+frigate:
+  url: http://localhost:5000
+
+mqtt:
+  host: localhost
+  username: fueragatos
+  password: clave-mqtt
+
+# Mismos nombres que en frigate.yml
+cameras:
+  - { name: timbre, title: Timbre }
+  - { name: frente, title: Frente }
+  - { name: fondo,  title: Fondo }
+  - { name: techo,  title: Techo }
+
+doorbell:
+  camera: timbre                  # una persona frente al timbre avisa aunque no lo pulsen
+  ring_topic: casa/timbre/ring    # lo publica el timbre / Home Assistant / un ESP32 al pulsar
+  # ring_payload: "ON"            # opcional: solo este contenido cuenta como pulsación
+  # open_topic: casa/puerta/abrir # opcional: botón "Abrir puerta" (pide confirmación)
+
+# Interruptores por MQTT (nodos ESPHome, Home Assistant, Tasmota...)
+switches:
+  - name: luz_patio
+    title: Luz patio
+    command_topic: casa/luz_patio/set
+    state_topic: casa/luz_patio/state
+
+labels: [person, cat, dog, package]   # qué se muestra y se avisa en vivo
+notify_labels: [person]               # cuáles mandan foto a Telegram
+notify:
+  telegram: { enabled: false, token: "", chat_id: "" }

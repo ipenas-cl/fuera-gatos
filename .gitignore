@@ -10,3 +10,4 @@ sounds/*.wav
 *.pt
 *_ncnn_model/
 config.yaml
+casa.yaml

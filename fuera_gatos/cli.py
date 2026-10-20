@@ -88,6 +88,13 @@ def cmd_aim(args) -> int:
     return 0
 
 
+def cmd_casa(args) -> int:
+    from .casa.runner import run_casa
+    from .casa.config import load_casa
+
+    return run_casa(load_casa(args.config), simulate=args.simulate)
+
+
 def cmd_check(args) -> int:
     """Muestra qué componentes opcionales están disponibles en este equipo."""
     checks = {
@@ -128,6 +135,11 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--simulate", action="store_true", help="No tocar GPIO ni sonido; solo registrar")
     s.add_argument("--max-frames", type=int, default=None, help=argparse.SUPPRESS)
     s.set_defaults(func=cmd_run)
+
+    s = sub.add_parser("casa", help="Panel web de casa: cámaras, timbre, historial e interruptores")
+    s.add_argument("-c", "--config", default="casa.yaml")
+    s.add_argument("--simulate", action="store_true", help="Sin MQTT real (el panel arranca igual)")
+    s.set_defaults(func=cmd_casa)
 
     s = sub.add_parser("simulate", help="Simular un guion de visitas con reloj acelerado")
     s.add_argument("-c", "--config", default="config.example.yaml")

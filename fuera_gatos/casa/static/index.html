@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="manifest" href="/manifest.json"><meta name="theme-color" content="#0f1216">
+<title>Casa</title>
+<style>
+:root{--bg:#0f1216;--card:#181d23;--line:#2b323b;--fg:#e8eaed;--mut:#8b95a1;--acc:#3b82f6;--warn:#f59e0b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px system-ui,sans-serif;padding:0 16px 80px}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 0}
+h1{font-size:18px;margin:0}h2{font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;margin:22px 0 8px}
+#banner{display:none;background:var(--warn);color:#111;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-weight:600;align-items:center;gap:10px}
+#banner.on{display:flex}#banner span{flex:1}
+button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 14px;cursor:pointer}
+button.pri{background:var(--acc);border:0;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.cam{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.cam img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#000}
+.cam .t{padding:8px 12px;display:flex;justify-content:space-between;color:var(--mut)}
+.sw{display:flex;flex-wrap:wrap;gap:8px}.sw button.on{background:var(--acc);border-color:var(--acc)}
+.ev{display:grid;grid-template-columns:96px 1fr auto;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;margin-bottom:8px}
+.ev img{width:96px;height:72px;object-fit:cover;border-radius:8px;background:#000}
+.ev small{color:var(--mut)}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}.filters button.on{background:var(--acc);border-color:var(--acc)}
+dialog{background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:14px;max-width:min(900px,96vw);width:100%;padding:12px}
+dialog::backdrop{background:#000a}dialog video,dialog img{width:100%;border-radius:10px;background:#000}
+#err{color:#f87171}
+</style></head><body>
+<header><h1>🏠 Casa</h1><button id="notif">Activar avisos</button></header>
+<div id="banner"><span id="bt"></span><button id="open" style="display:none">Abrir puerta</button><button id="dis">Cerrar</button></div>
+<div id="err"></div>
+<h2>Cámaras</h2><div class="grid" id="cams"></div>
+<div id="swwrap"><h2>Interruptores</h2><div class="sw" id="sw"></div></div>
+<h2>Historial</h2>
+<div class="filters" id="filters"></div>
+<div id="evs"></div>
+<dialog id="dlg"><div id="dbody"></div><p><button onclick="dlg.close();dbody.innerHTML=''">Cerrar</button></p></dialog>
+<script>
+const $=id=>document.getElementById(id);
+const LABELS={person:'Persona',cat:'Gato',dog:'Perro',package:'Paquete'};
+let cfg,filter='',cam='';
+const api=(p,o)=>fetch(p,o).then(r=>{if(r.status===401)location.href='/login.html';if(!r.ok)throw new Error(r.status);return r.json()});
+const fmt=t=>new Date(t*1000).toLocaleString('es',{weekday:'short',hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'});
+
+function refreshCams(){document.querySelectorAll('.cam img').forEach(i=>i.src='/frigate/api/'+i.dataset.cam+'/latest.jpg?t='+Date.now())}
+function renderCams(){
+  $('cams').innerHTML=cfg.cameras.map(c=>`<div class="cam"><img data-cam="${c.name}" alt="${c.title}"><div class="t"><b>${c.title}</b><span>en vivo</span></div></div>`).join('');
+  refreshCams();setInterval(refreshCams,2000);
+}
+function renderSwitches(){
+  $('swwrap').style.display=cfg.switches.length?'':'none';
+  $('sw').innerHTML=cfg.switches.map(s=>`<button data-n="${s.name}" class="${s.on?'on':''}">${s.title}</button>`).join('');
+  $('sw').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+    api('/api/switch/'+b.dataset.n,{method:'POST',body:JSON.stringify({on:!b.classList.contains('on')})}).catch(()=>$('err').textContent='No se pudo enviar la orden')};
+}
+function renderFilters(){
+  const opts=[['','Todo'],...Object.entries(LABELS)];
+  $('filters').innerHTML=opts.map(([k,v])=>`<button data-k="${k}" class="${k===filter?'on':''}">${v}</button>`).join('');
+  $('filters').onclick=e=>{const b=e.target.closest('button');if(b){filter=b.dataset.k;renderFilters();loadEvents()}};
+}
+async function loadEvents(){
+  try{
+    const q=new URLSearchParams({limit:60});if(filter)q.set('label',filter);
+    const evs=await api('/api/events?'+q);$('err').textContent='';
+    $('evs').innerHTML=evs.map(e=>`<div class="ev"><img loading="lazy" src="/frigate/api/events/${e.id}/thumbnail.jpg">
+      <div><b>${LABELS[e.label]||e.label}</b> · ${e.camera}<br><small>${fmt(e.start)} · ${Math.round(e.score*100)}%</small></div>
+      <div><button data-id="${e.id}" data-clip="${e.has_clip?1:0}">Ver</button></div></div>`).join('')||'<small>Sin eventos todavía.</small>';
+  }catch(x){$('err').textContent='No se pudo leer el historial (¿Frigate está encendido?)'}
+}
+$('evs').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+  $('dbody').innerHTML=b.dataset.clip==='1'
+    ?`<video controls autoplay playsinline src="/frigate/api/events/${b.dataset.id}/clip.mp4"></video>`
+    :`<img src="/frigate/api/events/${b.dataset.id}/snapshot.jpg">`;
+  $('dlg').showModal()};
+const dlg=$('dlg'),dbody=$('dbody');
+
+function banner(text,door){$('bt').textContent=text;$('open').style.display=door&&cfg.doorbell.can_open?'':'none';$('banner').classList.add('on')}
+$('dis').onclick=()=>$('banner').classList.remove('on');
+$('open').onclick=()=>{if(confirm('¿Abrir la puerta?'))api('/api/door/open',{method:'POST',body:'{}'})};
+function chime(){try{const a=new AudioContext(),o=a.createOscillator();o.connect(a.destination);o.frequency.value=880;o.start();o.stop(a.currentTime+.4)}catch(_){}}
+function system(title){if(window.Notification&&Notification.permission==='granted')new Notification(title)}
+$('notif').onclick=()=>Notification.requestPermission().then(()=>$('notif').style.display='none');
+if(!window.Notification||Notification.permission==='granted')$('notif').style.display='none';
+
+function live(){
+  const es=new EventSource('/api/stream');
+  es.onmessage=m=>{const e=JSON.parse(m.data);
+    if(e.kind==='ring'){banner('🔔 Tocan el timbre',true);chime();system('Tocan el timbre');refreshCams();loadEvents()}
+    else if(e.kind==='detect'){if(e.label==='person'){banner('Persona en '+e.camera,e.camera===cfg.doorbell.camera);system('Persona en '+e.camera)}
+      setTimeout(loadEvents,3000)}
+    else if(e.kind==='switch'){const b=document.querySelector(`#sw button[data-n="${e.name}"]`);if(b)b.classList.toggle('on',e.on)}};
+}
+(async()=>{cfg=await api('/api/config');renderCams();renderSwitches();renderFilters();loadEvents();live();
+  if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{})})();
+</script></body></html>

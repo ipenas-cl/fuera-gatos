@@ -80,6 +80,15 @@ una persona. Guía completa en [docs/central.md](docs/central.md); configuracion
 cd examples/central && docker compose up -d
 ```
 
+## Panel de casa (timbre, cámaras e historial)
+
+`fuera-gatos casa` levanta un panel web, instalable en el celular: cámaras en vivo,
+aviso y foto al tocar el timbre o pararse alguien frente a él, historial con clips
+guardados en tu disco (vía Frigate) e interruptores por MQTT. Reemplaza el uso de
+las apps de Ozom/Tuya/Smart Life, que no guardan nada y detectan mal. Guía, y qué
+hacer si tu cámara solo habla con la nube del fabricante, en [docs/casa.md](docs/casa.md);
+configuración en `casa.example.yaml`.
+
 ## Instalación (Raspberry Pi OS)
 
 ```bash
@@ -171,7 +180,8 @@ fuera_gatos/
                   relay.py (GPIO), sound.py, mqtt.py (nodos ESP32), simulated.py
   events.py       JSONL + capturas
   notify.py       Telegram
-docs/             hardware.md, humanitario.md, terreno.md, techo.md, central.md
+  casa/           panel web: server.py, hub.py (MQTT -> SSE), static/
+docs/             hardware.md, humanitario.md, terreno.md, techo.md, central.md, casa.md
 examples/         config.{frente,fondo,techo}.yaml (una Pi por caja)
 examples/central/ frigate.yml, docker-compose.yml, config.*.yaml (modo centralizado)
 examples/esphome/ nodo-{frente,fondo,techo}.yaml (firmware de los nodos ESP32)

@@ -33,3 +33,6 @@ include = ["fuera_gatos*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.setuptools.package-data]
+fuera_gatos = ["casa/static/*"]

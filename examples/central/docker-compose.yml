@@ -42,6 +42,15 @@ services:
              wait"
     depends_on: [mosquitto, frigate]
 
+  casa:                         # panel web: http://IP-laptop:8080
+    build: ../..
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./casa.yaml:/app/casa.yaml:ro
+    command: ["fuera-gatos", "casa", "-c", "casa.yaml"]
+    depends_on: [mosquitto, frigate]
+
 volumes:
   mosquitto-data:
   fg-data:
