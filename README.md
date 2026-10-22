@@ -146,7 +146,7 @@ pip install -e ".[dev]"
 ruff check . && pytest -q
 ```
 
-CI runs ruff, the tests on Python 3.9, 3.11 and 3.12, a config check, and a Docker build.
+CI runs ruff, the tests on Python 3.10, 3.12 and 3.13, a config check, and a Docker build.
 
 ## License
 
