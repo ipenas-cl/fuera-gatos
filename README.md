@@ -1,185 +1,153 @@
 # fuera-gatos
 
-Sistema de detección de gatos con cámara que los **asusta sin lastimarlos** para que
-dejen de usar el terreno como baño y de romper las bolsas de basura.
+[![ci](https://github.com/ipenas-cl/fuera-gatos/actions/workflows/ci.yml/badge.svg)](https://github.com/ipenas-cl/fuera-gatos/actions/workflows/ci.yml)
+![python](https://img.shields.io/badge/python-3.9%2B-3776ab) ![license](https://img.shields.io/badge/license-MIT-blue)
 
-La idea es simple: una cámara vigila las zonas problemáticas (la basura, el cantero),
-una red neuronal reconoce al gato, y una **torreta lanza un chorro fino de agua que
-lo persigue** durante unos segundos, en ráfagas. Poco caudal, mucho alcance, y el
-gato no sabe de dónde viene. Está pensado para gatos callejeros ya acostumbrados a
-perros, púas y ultrasonido: con ellos la luz y el sonido solos no sirven, así que el
-agua es la base desde la primera visita, no el último recurso.
+*English · [Español](README.es.md)*
 
+**A camera-based cat deterrent that scares cats away without hurting them.** A camera watches the problem
+areas (trash bags, flower beds). A neural network (YOLOv8) or a motion detector recognizes the cat, and a
+**pan/tilt water turret tracks it with a thin, low-flow jet** in short bursts, backed up by light, sound
+and ultrasound. It is built for street cats that are already used to dogs, spikes and ultrasonic
+repellents, so water is the baseline from the first visit.
+
+It runs on a single Raspberry Pi per location, or in **centralized mode**: one home server running
+Frigate and MQTT, PoE IP cameras outside, and ESP32 nodes that drive the relays and servos.
+
+## Safety principles: scare, never harm
+
+- **Surprise, not force.** A garden-gun or 12 V diaphragm-pump jet, never a pressure washer. Each activation lasts 4–6 s in bursts, with a hard per-device cap (`max_on_s`). The pump can't stay on.
+- **Bounded aiming.** The turret has configurable mechanical limits, so even a wrong detection can't aim at the sidewalk or a neighbor's yard.
+- **Confirmation.** Several detections inside a time window are needed before acting, so shadows and birds don't trigger anything.
+- **People and dogs shut everything down.** If a `person` or `dog` is anywhere in the frame, nothing fires.
+- **Cooldown and an hourly cap**, **quiet hours** (no audible sound at night), and **per-zone limits** (for example, no water on a shared roof).
+- **Escalation.** A quick return (under 5 minutes) moves up to level 2. After a long absence it resets to level 1.
+- **Resource guard.** A float switch blocks water deterrents when the tank is empty and sends an alert.
+
+See [docs/humanitario.md](docs/humanitario.md) (in Spanish) for what is and isn't safe, plus passive measures.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Sensing
+      CAM[Camera<br/>Pi NoIR + IR · USB · RTSP]
+      FR[Frigate NVR<br/>centralized mode]
+    end
+    subgraph fuera-gatos
+      DET[Detector<br/>YOLOv8 · motion · Frigate/MQTT]
+      Z[Zones<br/>polygons, paw anchor]
+      C[Controller state machine<br/>confirm · suppress · escalate<br/>cooldown · hourly cap · quiet hours]
+      G[Guards<br/>tank float switch]
+      EV[Event log JSONL<br/>+ snapshots]
+      N[Telegram alerts]
+    end
+    subgraph Deterrents
+      T[Water turret<br/>2 servos via PCA9685 + 12 V pump]
+      R[Relays<br/>light · sprinkler valve · ultrasound]
+      S[Speaker<br/>hiss / air sounds]
+      E[ESP32 nodes via MQTT<br/>firmware auto-off]
+    end
+    CAM --> DET
+    FR -- MQTT events --> DET
+    DET --> Z --> C
+    G --> C
+    C --> T & R & S & E
+    C --> EV --> N
 ```
- cámara ──> detector (YOLO o movimiento) ──> zonas ──> controlador ──> disuasores
-                                                          │              ├─ torreta (2 servos + bomba)
-                                                          │              ├─ aspersor fijo (electroválvula)
-                                                          │              ├─ luz (relé)
-                                                          │              ├─ sonido (parlante)
-                                                          │              └─ ultrasonido (relé)
-                                                          └──> registro JSONL + captura + Telegram
-```
 
-## Principios: asustar, nunca dañar
+### Hardware (single-Pi mode)
 
-* **Fuerte en sorpresa, no en fuerza.** El chorro es el de una pistola de riego o una
-  bomba de 12 V con boquilla fina: moja y persigue, no lastima. Nunca una hidrolavadora.
-* **Corto y con tope.** Cada activación dura 4-6 s en ráfagas y tiene un tope duro por
-  disuasor (`max_on_s`). La bomba nunca puede quedar encendida.
-* **Puntería acotada.** La torreta tiene límites mecánicos configurables: aunque el
-  detector se equivoque, no puede apuntar a la vereda ni al patio del vecino.
-* **Escalado.** Primera visita: torreta + luz. Si vuelve en menos de 5 minutos: torreta +
-  aspersor fijo + luz + sonido. Si pasa mucho tiempo sin verlo, se vuelve al nivel 1.
-* **Confirmación.** Hacen falta varias detecciones seguidas antes de actuar: una
-  sombra o un pájaro no disparan nada.
-* **Pausa y tope por hora.** Cooldown de 30 s entre activaciones y máximo 12 por hora.
-* **Personas y perros.** Si aparece una persona o un perro en el cuadro, se apaga todo
-  al instante y no se actúa. Nadie recibe un chorro de agua por error.
-* **Horario silencioso.** De noche solo se usan disuasores que no molestan a los
-  vecinos (luz, ultrasonido, agua).
-
-* **Límites por zona.** Cada zona puede restringir qué disuasores se usan. En un
-  techo compartido con los vecinos: luz y ultrasonido sí, agua nunca.
-
-En [docs/humanitario.md](docs/humanitario.md) se explica qué métodos son seguros,
-cuáles no, y qué medidas pasivas ayudan (tapa de basura, malla bajo la tierra, etc.).
-
-## Hardware
-
-Lista completa, cableado y alternativas en [docs/hardware.md](docs/hardware.md).
-Lo mínimo:
-
-| Pieza | Para qué |
+| Part | Purpose |
 |---|---|
-| Raspberry Pi 4 o 5 (2 GB alcanza) | Corre la detección |
-| Cámara Pi Module 3 **NoIR** + iluminador IR | Ver de noche, cuando más vienen |
-| Módulo de 4 relés 5 V optoacoplados | Bomba, válvula, luz y ultrasonido |
-| 2 servos metálicos (MG996R) + PCA9685 + soporte pan/tilt | Torreta que sigue al gato |
-| Bomba de diafragma 12 V + boquilla de chorro 1.5-2 mm + fuente 12 V | Chorro fino y largo con poco caudal |
-| Electroválvula 12 V + aspersor de impacto | Respaldo fijo para el nivel 2 |
-| Reflector LED 12 V | Luz repentina |
-| Parlante 3 W + amplificador PAM8403 | Bufido / chorro de aire |
-| Repelente ultrasónico comercial (disparado por relé) | Sonido que solo molesta al gato |
-| Caja estanca IP65 | Proteger todo del agua y la lluvia |
+| Raspberry Pi 4/5 (2 GB is enough) | Runs detection |
+| Pi Camera Module 3 **NoIR** + IR illuminator | Night vision, when cats show up most |
+| 4-channel opto-isolated 5 V relay module | Pump, valve, light, ultrasound |
+| 2 metal servos (MG996R) + PCA9685 + pan/tilt mount | Turret that follows the cat |
+| 12 V diaphragm pump + 1.5–2 mm jet nozzle | Long, thin, low-flow jet |
+| 12 V solenoid valve + impact sprinkler, LED floodlight, 3 W speaker + PAM8403, ultrasonic repellent | Level-2 backup and extra deterrents |
+| IP65 enclosure | Weather protection |
 
-Con una Pi Zero 2 W también funciona usando el detector por movimiento
-(`backend: motion`), menos preciso pero suficiente en zonas acotadas.
+A Pi Zero 2 W also works with `backend: motion`. Wiring, alternatives and a full bill of materials are in
+[docs/hardware.md](docs/hardware.md) and [docs/materiales.md](docs/materiales.md). The centralized setup
+(Frigate, Mosquitto, ESPHome nodes) is documented in [docs/central.md](docs/central.md).
 
-La lista de materiales completa, por ubicación y con el consolidado de compra, está en
-[docs/materiales.md](docs/materiales.md).
+## Quickstart
 
-## Modo centralizado (recomendado si ya tienes un servidor en casa)
-
-Una laptop o servidor viejo corre Frigate (grabador con detección), Mosquitto y
-fuera-gatos. Afuera solo van cámaras IP con PoE y un nodo ESP32 por ubicación para
-relés, servos y flotador. El mismo equipo graba las tres cámaras y avisa si entra
-una persona. Guía completa en [docs/central.md](docs/central.md); configuraciones en
-`examples/central/` (Frigate, docker-compose, fuera-gatos) y `examples/esphome/` (nodos).
-
-```bash
-cd examples/central && docker compose up -d
-```
-
-## Instalación (Raspberry Pi OS)
-
-```bash
-git clone https://github.com/ipenas-cl/fuera-gatos.git
-cd fuera-gatos
-./scripts/install.sh          # paquetes, venv, sonidos, config.yaml y servicio systemd
-nano config.yaml              # pines, zonas, horarios
-.venv/bin/fuera-gatos check -c config.yaml
-.venv/bin/fuera-gatos test-deterrents -c config.yaml --seconds 1   # probar cableado
-.venv/bin/fuera-gatos aim -c config.yaml --pan 90 --tilt 50 --water 1   # calibrar torreta
-.venv/bin/fuera-gatos run -c config.yaml
-sudo systemctl enable --now fuera-gatos                            # arrancar solo
-```
-
-Sin hardware (para probar la lógica en cualquier PC):
+No hardware needed, on any machine:
 
 ```bash
 pip install -e ".[dev]"
 python scripts/make_sounds.py
-fuera-gatos simulate                  # guion de visitas con reloj acelerado
-fuera-gatos simulate --hour 23        # lo mismo, en horario silencioso
-fuera-gatos run -c config.example.yaml --simulate   # cámara real, GPIO simulado
-pytest
+fuera-gatos simulate              # scripted cat visits with an accelerated clock
+fuera-gatos simulate --hour 23    # same scenario, during quiet hours
+pytest                            # 59 tests, hardware fully mocked
 ```
 
-## Terreno con antejardín, techo compartido y jardín trasero
-
-Si los gatos circulan por el techo y bajan a ambos jardines, hacen falta tres cámaras:
-frente, fondo y techo, cada una con sus zonas y sus relés. Hay configuraciones de
-ejemplo en `examples/`, una guía con la ubicación de cámaras, torretas y zonas en
-[docs/terreno.md](docs/terreno.md) y otra para el techo con agua autónoma (estanque,
-bomba y flotador) en [docs/techo.md](docs/techo.md). Cada cámara corre como un servicio:
+On a Raspberry Pi:
 
 ```bash
-cp examples/config.frente.yaml config.frente.yaml
-cp examples/config.fondo.yaml config.fondo.yaml
-cp examples/config.techo.yaml config.techo.yaml
-sudo systemctl enable --now fuera-gatos@frente fuera-gatos@fondo fuera-gatos@techo
+git clone https://github.com/ipenas-cl/fuera-gatos.git && cd fuera-gatos
+./scripts/install.sh                                              # packages, venv, sounds, config.yaml, systemd unit
+.venv/bin/fuera-gatos check -c config.yaml                        # dependencies + config validation
+.venv/bin/fuera-gatos test-deterrents -c config.yaml --seconds 1  # check the wiring
+.venv/bin/fuera-gatos aim -c config.yaml --pan 90 --tilt 50 --water 1   # calibrate the turret
+sudo systemctl enable --now fuera-gatos
 ```
 
-## Configuración
+Several cameras (front yard, backyard, roof) run as one systemd instance each:
+`sudo systemctl enable --now fuera-gatos@frente fuera-gatos@fondo fuera-gatos@techo` (configs in `examples/`).
 
-Todo está en `config.yaml` (ver `config.example.yaml`, comentado). Lo más importante:
+Centralized mode: `cd examples/central && docker compose up -d`.
 
-* **`zones.include`**: polígonos en píxeles donde sí se actúa. Dibuja uno sobre la
-  basura y otro sobre el cantero; el resto del cuadro se ignora. Un gato cuenta como
-  "dentro" si sus patas (base del cuadro) caen en el polígono. Para sacar las
-  coordenadas, guarda una captura y mírala en cualquier editor de imágenes.
-  Con `deterrents: [luz, ultrasonido]` una zona limita qué se puede usar en ella.
-* **`controller.escalation`**: niveles, qué disuasores usa cada uno y cuántos segundos.
-* **`controller.quiet_hours`**: horario nocturno y qué disuasores se permiten.
-* **`deterrents`**: la torreta (`turret`: relé de bomba, servos, calibración píxel a
-  grado, límites y ráfagas), relés (`relay`, con `pulse_on_s`/`pulse_off_s` opcionales),
-  sonido (`sound`, archivos WAV), o sus equivalentes remotos por MQTT hacia un nodo
-  ESP32 (`mqtt_switch`, `mqtt_turret`).
-* **`detector.suppress_labels`**: etiquetas que bloquean todo (`person`, `dog`).
-* **`sensors`**: flotador del estanque (`float_switch`) que custodia una lista de
-  disuasores (`gates`): sin agua no se activan y llega un aviso para rellenar.
+## Configuration
 
-### Detector
+Everything lives in `config.yaml`. See the fully commented [`config.example.yaml`](config.example.yaml).
 
-* `yolo` (recomendado): YOLOv8n reconoce la clase `cat` de COCO con buena precisión.
-  En la Pi conviene exportar a NCNN una vez (`yolo export model=yolov8n.pt format=ncnn imgsz=320`)
-  y poner `model: yolov8n_ncnn_model`; da unos 5-10 fps en Pi 4 y más en Pi 5.
-* `motion`: diferencia de cuadros con filtro por tamaño del bulto. No sabe qué es un
-  gato, así que úsalo solo con zonas bien acotadas y `min_area`/`max_area` ajustados.
-* `frigate`: no procesa video; lee por MQTT los objetos que Frigate ya reconoció en la
-  cámara indicada. Es el modo centralizado.
+| Section | What it controls |
+|---|---|
+| `camera` | `picamera` · `usb` · `rtsp` · `synthetic`, resolution, analyzed fps, rotation |
+| `detector` | `yolo` (COCO `cat`; export to NCNN on a Pi for 5–10 fps), `motion` (frame diff + blob size filter) or `frigate` (MQTT events); `confidence`, `target_labels`, `suppress_labels` |
+| `zones.include` | Pixel polygons where action is allowed, each with an optional deterrent whitelist. A cat counts as inside when its paws (bottom-center of the box) fall in the polygon |
+| `controller` | `confirm_frames`/`confirm_window_s`, `cooldown_s`, `max_activations_per_hour`, `escalation` levels, `quiet_hours` |
+| `deterrents` | `turret` (pump relay, PCA9685/gpiozero servos, pixel-to-degree calibration, limits, bursts, motion lead), `relay`, `sound`, and remote `mqtt_switch`/`mqtt_turret` for ESP32 nodes |
+| `sensors` | `float_switch` (GPIO or MQTT) that gates water deterrents |
+| `events`, `notify` | JSONL log + snapshots, optional Telegram photo alerts |
 
-## Registro y avisos
+## Design decisions
 
-Cada activación queda en `data/events.jsonl` con la captura en `data/snapshots/`.
-Sirve para ver a qué horas viene el gato y ajustar zonas o niveles. Con
-`notify.telegram` activado, llega la foto al teléfono en cada activación.
+- **Safety lives in code, not in the hardware choice.** Hard `max_on_s` caps, mechanical aim limits, person/dog suppression, and firmware auto-off on the ESP32 nodes mean no single bug can leave a pump running or point the jet at a person.
+- **A pure state machine in the controller.** Confirmation, escalation, cooldowns and quiet hours are deterministic logic with an injectable clock, so they're tested without a camera, GPIO or real time.
+- **Pluggable detectors and deterrents behind small protocols.** YOLO, motion and Frigate all produce the same `Detection`, and GPIO, MQTT and simulated outputs share one deterrent interface. Swapping a Pi for a central NVR is a config change.
+- **Paw-anchor zones.** Using the bottom-center of the bounding box (where the cat stands) instead of the box center keeps zones accurate under perspective.
+- **Turret with motion lead and bursts.** It aims slightly ahead of a moving cat, and pulsed water is more startling while using about half the water.
+- **Optional dependencies.** The core needs only NumPy and PyYAML. `ultralytics`, `picamera2`, `gpiozero` and `paho-mqtt` are extras, so a Pi Zero or CI runner installs only what it uses.
+- **Observable.** Every decision (activated, suppressed, rate limited, tank empty) is a JSONL event with a snapshot, which is how you tune zones and levels.
 
-## Estructura
+## Project layout
 
 ```
 fuera_gatos/
-  cli.py          comandos: run, simulate, test-deterrents, aim, check
-  pipeline.py     bucle cámara -> detector -> zonas -> controlador
-  controller.py   máquina de estados (confirmación, escalado, cooldown, supresión)
-  zones.py        polígonos de actuación
-  sensors.py      flotador de nivel del estanque (GPIO o MQTT)
-  mqtt.py         cliente MQTT compartido (Frigate y nodos ESP32)
-  camera.py       picamera2, OpenCV (USB/RTSP) o sintética
+  cli.py          run · simulate · test-deterrents · aim · check
+  pipeline.py     camera -> detector -> zones -> controller loop
+  controller.py   state machine (confirmation, escalation, cooldown, suppression, guards)
+  zones.py        action polygons          sensors.py   tank float switch (GPIO/MQTT)
+  camera.py       picamera2, OpenCV (USB/RTSP), synthetic
   detection/      yolo.py, motion.py, frigate.py, scripted.py
-  deterrents/     turret.py (pan/tilt + bomba), servo.py (PCA9685/gpiozero),
-                  relay.py (GPIO), sound.py, mqtt.py (nodos ESP32), simulated.py
-  events.py       JSONL + capturas
-  notify.py       Telegram
-docs/             hardware.md, humanitario.md, terreno.md, techo.md, central.md
-examples/         config.{frente,fondo,techo}.yaml (una Pi por caja)
-examples/central/ frigate.yml, docker-compose.yml, config.*.yaml (modo centralizado)
-examples/esphome/ nodo-{frente,fondo,techo}.yaml (firmware de los nodos ESP32)
-scripts/          install.sh, make_sounds.py
-systemd/          fuera-gatos.service (una cámara), fuera-gatos@.service (varias)
-tests/            pytest (lógica pura, sin hardware)
+  deterrents/     turret.py, servo.py (PCA9685/gpiozero), relay.py, sound.py, mqtt.py, simulated.py
+  events.py       JSONL + snapshots            notify.py    Telegram (stdlib only)
+docs/ examples/ scripts/ systemd/ tests/
 ```
 
-## Licencia
+## Development
 
-MIT.
+```bash
+pip install -e ".[dev]"
+ruff check . && pytest -q
+```
+
+CI runs ruff, the tests on Python 3.9, 3.11 and 3.12, a config check, and a Docker build.
+
+## License
+
+MIT
