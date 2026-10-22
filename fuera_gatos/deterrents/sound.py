@@ -40,7 +40,7 @@ class SoundDeterrent(TimedDeterrent):
             log.warning("Sin archivos de sonido; '%s' no hace nada", self.name)
             return
         f = random.choice(self.files)
-        self._proc = subprocess.Popen(self._cmd + [str(f)], stdout=subprocess.DEVNULL,
+        self._proc = subprocess.Popen([*self._cmd, str(f)], stdout=subprocess.DEVNULL,
                                       stderr=subprocess.DEVNULL)
         log.info("Sonido '%s': %s", self.name, f.name)
 

@@ -41,7 +41,7 @@ def test_aim_moves_servos_to_pixel_position():
 
 
 def test_aim_leads_moving_target():
-    t, servo, _ = make_turret(lead_s=0.5)
+    t, _servo, _ = make_turret(lead_s=0.5)
     t.aim(100, 300, ts=0.0)
     t.aim(200, 300, ts=0.25)  # 400 px/s hacia la derecha
     assert t.aimed_at[0] == 400  # 200 + 400 * 0.5
@@ -58,7 +58,7 @@ def test_small_moves_are_ignored_to_avoid_jitter():
 def test_valve_opens_and_closes_with_activation():
     import time
 
-    t, servo, valve = make_turret(lead_s=0.0)
+    t, _servo, valve = make_turret(lead_s=0.0)
     t.aim(320, 290, ts=0.0)
     t.start(0.1)
     assert valve.state == ["on"]
@@ -68,10 +68,10 @@ def test_valve_opens_and_closes_with_activation():
 
 
 def test_controller_pre_aims_and_tracks_while_active(env):
-    from fuera_gatos.detection.base import Detection
     from fuera_gatos.config import EscalationLevel
+    from fuera_gatos.detection.base import Detection
 
-    ctrl, dets, events, clock = env(escalation=[EscalationLevel("agua", ["torreta"], 4.0)])
+    ctrl, _dets, _events, clock = env(escalation=[EscalationLevel("agua", ["torreta"], 4.0)])
     t, servo, valve = make_turret(lead_s=0.0)
     ctrl.deterrents["torreta"] = t
     cat = Detection("cat", 0.9, (300, 250, 340, 290), zone="jardin")

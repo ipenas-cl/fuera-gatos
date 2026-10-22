@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 import yaml
 
@@ -17,14 +19,14 @@ def test_example_config_loads():
 
 
 def test_unknown_deterrent_in_level_is_rejected():
-    raw = yaml.safe_load(open("config.example.yaml"))
+    raw = yaml.safe_load(Path("config.example.yaml").read_text(encoding="utf-8"))
     raw["controller"]["escalation"][0]["deterrents"].append("laser")
     with pytest.raises(ConfigError, match="laser"):
         config_from_dict(raw)
 
 
 def test_excessive_duration_is_rejected():
-    raw = yaml.safe_load(open("config.example.yaml"))
+    raw = yaml.safe_load(Path("config.example.yaml").read_text(encoding="utf-8"))
     raw["controller"]["escalation"][0]["duration_s"] = 120
     with pytest.raises(ConfigError, match="duration_s"):
         config_from_dict(raw)
@@ -51,7 +53,7 @@ def test_example_multi_camera_configs_load():
 
 
 def test_zone_with_unknown_deterrent_is_rejected():
-    raw = yaml.safe_load(open("config.example.yaml"))
+    raw = yaml.safe_load(Path("config.example.yaml").read_text(encoding="utf-8"))
     raw["zones"]["include"][0]["deterrents"] = ["canon"]
     with pytest.raises(ConfigError, match="canon"):
         config_from_dict(raw)

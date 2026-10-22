@@ -81,9 +81,12 @@ class WaterTurret(TimedDeterrent):
         return pan, tilt
 
     def _move(self, pan: float, tilt: float) -> None:
-        if self._angles is not None:
-            if abs(pan - self._angles[0]) < self.min_step_deg and abs(tilt - self._angles[1]) < self.min_step_deg:
-                return
+        if (
+            self._angles is not None
+            and abs(pan - self._angles[0]) < self.min_step_deg
+            and abs(tilt - self._angles[1]) < self.min_step_deg
+        ):
+            return
         self.servo.set_angle(self.pan_channel, pan)
         self.servo.set_angle(self.tilt_channel, tilt)
         self._angles = (pan, tilt)
@@ -113,7 +116,7 @@ class WaterTurret(TimedDeterrent):
             self._move(*self.rest_angles)
         try:
             self.servo.close()
-        except Exception:  # pragma: no cover
-            pass
+        except Exception:  # pragma: no cover - best-effort hardware cleanup
+            log.debug("cleanup failed", exc_info=True)
         if self.valve is not None and hasattr(self.valve, "close"):
             self.valve.close()

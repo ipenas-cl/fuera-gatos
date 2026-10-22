@@ -55,8 +55,8 @@ class GpiozeroServoDriver:
         for s in self._servos.values():
             try:
                 s.close()  # type: ignore[attr-defined]
-            except Exception:  # pragma: no cover
-                pass
+            except Exception:  # pragma: no cover - best-effort hardware cleanup
+                log.debug("cleanup failed", exc_info=True)
 
 
 class PCA9685ServoDriver:
@@ -91,8 +91,8 @@ class PCA9685ServoDriver:
     def close(self) -> None:
         try:
             self._bus.close()
-        except Exception:  # pragma: no cover
-            pass
+        except Exception:  # pragma: no cover - best-effort hardware cleanup
+            log.debug("cleanup failed", exc_info=True)
 
 
 def build_servo_driver(opts: dict, simulate: bool = False) -> ServoDriver:

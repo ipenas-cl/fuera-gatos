@@ -19,10 +19,10 @@ def test_end_to_end_synthetic(tmp_path):
     }
     cfg = config_from_dict(raw)
     assert run(cfg, simulate=True, max_frames=80) == 0
-    lines = [json.loads(l) for l in (tmp_path / "events.jsonl").read_text().splitlines()]
-    kinds = [l["kind"] for l in lines]
+    lines = [json.loads(line) for line in (tmp_path / "events.jsonl").read_text().splitlines()]
+    kinds = [e["kind"] for e in lines]
     assert "activated" in kinds
-    act = next(l for l in lines if l["kind"] == "activated")
+    act = next(e for e in lines if e["kind"] == "activated")
     assert act["deterrents"] == ["luz"]
     assert act["detections"][0]["zone"] == "jardin"
     assert list((tmp_path / "snaps").iterdir())

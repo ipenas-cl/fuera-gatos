@@ -70,8 +70,8 @@ class MqttBus:
         try:
             self._client.loop_stop()
             self._client.disconnect()
-        except Exception:  # pragma: no cover
-            pass
+        except Exception:  # pragma: no cover - best-effort hardware cleanup
+            log.debug("cleanup failed", exc_info=True)
 
 
 def _match(pattern: str, topic: str) -> bool:

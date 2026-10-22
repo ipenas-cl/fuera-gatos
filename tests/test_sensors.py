@@ -24,7 +24,7 @@ def test_empty_tank_blocks_water_but_not_light(env, cat):
 
 def test_empty_notice_only_once_until_refilled(env, cat):
     tank = SimulatedSensor("nivel", gates=["aspersor"], state=False)
-    ctrl, dets, events, clock = env(
+    ctrl, _dets, events, clock = env(
         escalation=[EscalationLevel("agua", ["aspersor"], 4.0)],
         guards=guards_from_sensors({"nivel": tank}),
     )
@@ -48,7 +48,7 @@ def test_failing_sensor_counts_as_empty(env, cat):
     def boom():
         raise OSError("i2c")
 
-    ctrl, dets, events, clock = env(
+    ctrl, dets, _events, clock = env(
         escalation=[EscalationLevel("agua", ["aspersor"], 4.0)], guards={"aspersor": boom},
     )
     frames(ctrl, clock, [cat], 3)

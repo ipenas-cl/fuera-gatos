@@ -1,4 +1,3 @@
-import json
 
 from fuera_gatos.detection.frigate import FrigateDetector
 from fuera_gatos.deterrents.mqtt import MqttSwitch, build_mqtt_turret

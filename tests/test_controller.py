@@ -21,7 +21,7 @@ def test_needs_confirmation_before_acting(env, cat):
 
 
 def test_single_glimpse_does_not_trigger(env, cat):
-    ctrl, dets, events, clock = env()
+    ctrl, _dets, events, clock = env()
     ctrl.process([cat])
     clock.advance(3.0)  # fuera de la ventana de confirmación
     ctrl.process([cat])
@@ -62,7 +62,7 @@ def test_escalates_when_cat_returns_soon(env, cat):
 
 
 def test_resets_to_first_level_after_long_absence(env, cat):
-    ctrl, dets, events, clock = env()
+    ctrl, _dets, events, clock = env()
     frames(ctrl, clock, [cat], 3)
     clock.advance(600.0)
     ctrl.process([])
@@ -93,7 +93,7 @@ def test_person_alone_prevents_confirmation(env, cat, person):
 
 
 def test_rate_limit_per_hour(env, cat):
-    ctrl, dets, events, clock = env(max_activations_per_hour=2)
+    ctrl, _dets, events, clock = env(max_activations_per_hour=2)
     for _ in range(3):
         frames(ctrl, clock, [cat], 3)
         clock.advance(40.0)
@@ -127,13 +127,13 @@ def test_quiet_hours_with_nothing_allowed_does_not_act(env, cat):
 def test_duration_capped_by_deterrent_hard_limit(env, cat):
     from fuera_gatos.config import EscalationLevel
 
-    ctrl, dets, events, clock = env(escalation=[EscalationLevel("largo", ["aspersor"], 30.0)])
+    ctrl, dets, _events, clock = env(escalation=[EscalationLevel("largo", ["aspersor"], 30.0)])
     frames(ctrl, clock, [cat], 3)
     assert ("start", 5.0) in dets["aspersor"].calls
 
 
 def test_close_stops_everything(env, cat):
-    ctrl, dets, events, clock = env()
+    ctrl, dets, _events, clock = env()
     frames(ctrl, clock, [cat], 3)
     ctrl.close()
     assert not any(d.active for d in dets.values())
@@ -175,7 +175,7 @@ def test_zone_can_forbid_deterrents(env, cat):
 def test_cat_in_roof_and_garden_blocks_water_for_both(env, cat):
     from fuera_gatos.detection.base import Detection
 
-    ctrl, dets, events, clock = env(zone_deterrents={"techo": ["luz"], "basura": None})
+    ctrl, _dets, events, clock = env(zone_deterrents={"techo": ["luz"], "basura": None})
     roof_cat = Detection("cat", 0.9, (200, 50, 260, 90), zone="techo")
     frames(ctrl, clock, [cat, roof_cat], 3)
     assert events[-1].deterrents == ["luz"]

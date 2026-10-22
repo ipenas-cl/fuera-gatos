@@ -47,8 +47,8 @@ class FloatSwitch:
     def close(self) -> None:
         try:
             self._dev.close()
-        except Exception:  # pragma: no cover
-            pass
+        except Exception:  # pragma: no cover - best-effort hardware cleanup
+            log.debug("cleanup failed", exc_info=True)
 
 
 class SimulatedSensor:

@@ -34,5 +34,5 @@ class RelayDeterrent(TimedDeterrent):
         super().close()
         try:
             self._device.close()
-        except Exception:  # pragma: no cover
-            pass
+        except Exception:  # pragma: no cover - best-effort hardware cleanup
+            log.debug("cleanup failed", exc_info=True)

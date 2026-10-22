@@ -41,7 +41,6 @@ def cmd_simulate(args) -> int:
 
 def cmd_test_deterrents(args) -> int:
     from .deterrents import build_deterrents
-
     from .pipeline import build_bus
 
     cfg = load_config(args.config)
@@ -64,7 +63,6 @@ def cmd_test_deterrents(args) -> int:
 def cmd_aim(args) -> int:
     """Mueve la torreta a un ángulo fijo (y opcionalmente abre el agua) para calibrar."""
     from .deterrents import build_deterrents
-
     from .pipeline import build_bus
 
     cfg = load_config(args.config)
@@ -74,7 +72,7 @@ def cmd_aim(args) -> int:
     bus = build_bus(cfg, simulate=args.simulate)
     dets = build_deterrents({args.name: cfg.deterrents[args.name]}, simulate=args.simulate, bus=bus)
     t = dets[args.name]
-    t._move(args.pan, args.tilt)  # noqa: SLF001 - uso deliberado para calibrar
+    t._move(args.pan, args.tilt)
     print(f"Torreta en pan={args.pan}° tilt={args.tilt}°. "
           "Anota en qué píxel de la captura cae el chorro para calibration.pan/tilt.")
     if args.water > 0:
